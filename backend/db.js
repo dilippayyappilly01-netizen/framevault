@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { DatabaseSync } = require('node:sqlite');
+const { createTursoClient } = require('./turso');
 
 function mapLicenseRow(row) {
   if (!row) return null;
@@ -144,6 +145,8 @@ function createDatabase(config) {
     }
   }
 
+  const turso = createTursoClient(config);
+
   // Resolve HMAC signing secret (env takes precedence; otherwise persistent DB secret)
   function getSigningSecret() {
     if (config.signingSecretEnv) {
@@ -156,7 +159,28 @@ function createDatabase(config) {
     return generated;
   }
 
-  const signingSecret = getSigningSecret();
+  let signingSecret = getSigningSecret();
+
+  // Hydrate local SQLite from Turso cloud DB on startup (survives Render Free Tier restarts)
+  const ready = turso.enabled
+    ? turso
+        .hydrateLocalDb(db)
+        .then(res => {
+          if (!config.signingSecretEnv) {
+            const hydratedSecret = stmtGetSetting.get('signing_secret')?.value;
+            if (hydratedSecret) {
+              signingSecret = hydratedSecret;
+            } else {
+              turso.enqueueWrite(
+                'INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)',
+                ['signing_secret', signingSecret]
+              );
+            }
+          }
+          return res;
+        })
+        .catch(err => ({ hydrated: false, error: err.message }))
+    : Promise.resolve({ hydrated: false, licenseCount: 0 });
 
   function issueLicense({
     email,
@@ -196,6 +220,23 @@ function createDatabase(config) {
           null
         );
         const inserted = stmtFindByKey.get(licenseKey);
+        turso.enqueueWrite(
+          `INSERT OR IGNORE INTO licenses (
+            license_key, email, amount_cents, currency, method, external_id, payment_intent_id, active, created_at, revoked_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            licenseKey,
+            cleanEmail,
+            Number(amountCents),
+            String(currency || 'usd').toLowerCase(),
+            String(method),
+            cleanExternalId,
+            paymentIntentId ? String(paymentIntentId) : null,
+            1,
+            now,
+            null
+          ]
+        );
         return { license: mapLicenseRow(inserted), created: true };
       } catch (err) {
         if (cleanExternalId) {
@@ -229,28 +270,54 @@ function createDatabase(config) {
   }
 
   function revokeLicenseByKey(licenseKey) {
-    const res = stmtRevokeByKey.run(new Date().toISOString(), String(licenseKey).trim());
+    const now = new Date().toISOString();
+    const key = String(licenseKey).trim();
+    const res = stmtRevokeByKey.run(now, key);
+    if (res.changes > 0) {
+      turso.enqueueWrite(
+        'UPDATE licenses SET active = 0, revoked_at = ? WHERE license_key = ? AND active = 1',
+        [now, key]
+      );
+    }
     return res.changes > 0;
   }
 
   function revokeLicenseByPaymentIntent(paymentIntentId) {
     if (!paymentIntentId) return false;
-    const res = stmtRevokeByPaymentIntent.run(new Date().toISOString(), String(paymentIntentId).trim());
+    const now = new Date().toISOString();
+    const pid = String(paymentIntentId).trim();
+    const res = stmtRevokeByPaymentIntent.run(now, pid);
+    if (res.changes > 0) {
+      turso.enqueueWrite(
+        'UPDATE licenses SET active = 0, revoked_at = ? WHERE payment_intent_id = ? AND active = 1',
+        [now, pid]
+      );
+    }
     return res.changes > 0;
   }
 
   function recordStripeEvent(eventId, eventType) {
-    const res = stmtInsertStripeEvent.run(
-      String(eventId),
-      String(eventType || 'unknown'),
-      new Date().toISOString()
-    );
+    const now = new Date().toISOString();
+    const eid = String(eventId);
+    const etype = String(eventType || 'unknown');
+    const res = stmtInsertStripeEvent.run(eid, etype, now);
+    if (res.changes > 0) {
+      turso.enqueueWrite(
+        'INSERT OR IGNORE INTO stripe_events (event_id, event_type, processed_at) VALUES (?, ?, ?)',
+        [eid, etype, now]
+      );
+    }
     return res.changes > 0;
   }
 
   function logExport(licenseKey, componentId) {
     try {
-      stmtLogExport.run(String(licenseKey), String(componentId || 'unknown'), new Date().toISOString());
+      const now = new Date().toISOString();
+      stmtLogExport.run(String(licenseKey), String(componentId || 'unknown'), now);
+      turso.enqueueWrite(
+        'INSERT INTO export_logs (license_key, component_id, created_at) VALUES (?, ?, ?)',
+        [String(licenseKey), String(componentId || 'unknown'), now]
+      );
     } catch (_) {
       // Non-fatal telemetry error
     }
@@ -265,7 +332,12 @@ function createDatabase(config) {
   }
 
   return {
-    signingSecret,
+    get signingSecret() {
+      return signingSecret;
+    },
+    ready,
+    flush: () => turso.flush(),
+    tursoStatus: () => turso.getStatus(),
     issueLicense,
     findActiveLicenseByKey,
     findLicenseByExternalId,

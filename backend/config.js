@@ -41,6 +41,9 @@ function createConfig(rootDir, overrides = {}) {
   const razorpayKeySecret = String(env.RAZORPAY_KEY_SECRET || '').trim();
   const razorpayWebhookSecret = String(env.RAZORPAY_WEBHOOK_SECRET || '').trim();
   const razorpayConfigured = Boolean(razorpayKeyId && razorpayKeySecret);
+  const tursoDatabaseUrl = String(env.TURSO_DATABASE_URL || '').trim();
+  const tursoAuthToken = String(env.TURSO_AUTH_TOKEN || '').trim();
+  const tursoConfigured = Boolean(tursoDatabaseUrl && tursoAuthToken);
   const publicUrl = String(env.PUBLIC_URL || '').trim().replace(/\/+$/, '');
   const licenseCurrency = String(
     env.LICENSE_CURRENCY || (razorpayConfigured && !stripeSecretKey ? 'INR' : 'USD')
@@ -92,6 +95,9 @@ function createConfig(rootDir, overrides = {}) {
     razorpayWebhookSecret,
     razorpayConfigured,
     razorpayWebhookConfigured: Boolean(razorpayWebhookSecret),
+    tursoDatabaseUrl,
+    tursoAuthToken,
+    tursoConfigured,
     demoCheckoutEnabled,
     cookieSecure,
     signingSecretEnv: String(env.ORIGINKIT_SECRET || '').trim(),

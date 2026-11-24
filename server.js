@@ -254,7 +254,9 @@ function createAppServer(configOverrides = {}, deps = {}) {
     if (safeUrl === '/api/health' && req.method === 'GET') {
       return sendJson(req, res, config, 200, {
         ok: true,
-        db: 'sqlite',
+        db: config.tursoConfigured ? 'sqlite+turso' : 'sqlite',
+        tursoConfigured: config.tursoConfigured,
+        tursoHydrated: Boolean(db.tursoStatus().hydrated),
         components: catalog.components.length,
         sections: catalog.sections.length,
         stripeConfigured: config.stripeConfigured,
@@ -1406,24 +1408,30 @@ function createAppServer(configOverrides = {}, deps = {}) {
 if (require.main === module) {
   const app = createAppServer();
   const onListen = () => {
+    const tursoInfo = app.db.tursoStatus();
     console.log(`\n======================================================`);
     console.log(`  FRAMEVAULT COMPONENT VAULT (${app.config.nodeEnv.toUpperCase()})`);
     console.log(`  URL:      http://localhost:${app.config.port}`);
     console.log(`  DB:       ${app.config.databasePath}`);
+    console.log(`  Turso:    ${tursoInfo.enabled ? (tursoInfo.hydrated ? 'CONNECTED & HYDRATED' : 'CONFIGURED') : 'NOT CONFIGURED (local SQLite only)'}`);
     console.log(`  Razorpay: ${app.config.razorpayConfigured ? 'ENABLED' : 'NOT CONFIGURED'} (Webhook: ${app.config.razorpayWebhookConfigured ? 'YES' : 'NO'})`);
     console.log(`  Stripe:   ${app.config.stripeConfigured ? 'ENABLED' : 'NOT CONFIGURED'} (Webhook: ${app.config.webhookConfigured ? 'YES' : 'NO'})`);
     console.log(`  Price:    ${app.config.licensePriceDisplay} (${app.config.licenseCurrency})`);
     console.log(`  Demo Pay: ${app.config.demoCheckoutEnabled ? 'ENABLED (local dev)' : 'DISABLED'}`);
     console.log(`======================================================\n`);
   };
-  if (app.config.host) {
-    app.server.listen(app.config.port, app.config.host, onListen);
-  } else {
-    app.server.listen(app.config.port, onListen);
-  }
+
+  Promise.resolve(app.db.ready).finally(() => {
+    if (app.config.host) {
+      app.server.listen(app.config.port, app.config.host, onListen);
+    } else {
+      app.server.listen(app.config.port, onListen);
+    }
+  });
 
   const handleSignal = () => {
-    app.server.close(() => {
+    app.server.close(async () => {
+      try { await app.db.flush(); } catch (_) {}
       app.shutdown();
       process.exit(0);
     });

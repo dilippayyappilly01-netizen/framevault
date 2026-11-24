@@ -17,6 +17,8 @@ function startTestServer(overrides = {}, deps = {}) {
     RAZORPAY_WEBHOOK_SECRET: '',
     STRIPE_SECRET_KEY: '',
     STRIPE_WEBHOOK_SECRET: '',
+    TURSO_DATABASE_URL: '',
+    TURSO_AUTH_TOKEN: '',
     ...overrides
   }, deps);
   return {
@@ -887,5 +889,131 @@ test('Remote Streamable HTTP MCP (/api/mcp) requires license Bearer key and serv
     assert.match(mcpInfoRes.json.configs.claude.json, new RegExp(license.licenseKey));
   } finally {
     await srv.close();
+  }
+});
+
+test('Turso cloud SQLite sync persists licenses & revocations across ephemeral Render Free Tier restarts', async () => {
+  const http = require('node:http');
+  const { DatabaseSync } = require('node:sqlite');
+
+  // Mock Turso Hrana HTTP v2 server backed by an in-memory SQLite DB
+  const cloudDb = new DatabaseSync(':memory:');
+  const expectedToken = 'turso_test_token_abc123';
+
+  const mockTurso = http.createServer((req, res) => {
+    if (req.url !== '/v2/pipeline' || req.method !== 'POST') {
+      res.writeHead(404);
+      return res.end('not found');
+    }
+    if (req.headers.authorization !== `Bearer ${expectedToken}`) {
+      res.writeHead(401);
+      return res.end('unauthorized');
+    }
+    const chunks = [];
+    req.on('data', c => chunks.push(c));
+    req.on('end', () => {
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      const results = [];
+      for (const item of body.requests || []) {
+        if (item.type === 'close') {
+          results.push({ type: 'ok', response: { type: 'close' } });
+          continue;
+        }
+        const sql = item.stmt.sql;
+        const args = (item.stmt.args || []).map(a => {
+          if (a.type === 'null') return null;
+          if (a.type === 'integer') return Number(a.value);
+          if (a.type === 'float') return Number(a.value);
+          return a.value;
+        });
+        try {
+          if (/^\s*SELECT\b/i.test(sql)) {
+            const rows = cloudDb.prepare(sql).all(...args);
+            const colNames = rows.length > 0 ? Object.keys(rows[0]) : [];
+            results.push({
+              type: 'ok',
+              response: {
+                type: 'execute',
+                result: {
+                  cols: colNames.map(name => ({ name })),
+                  rows: rows.map(r =>
+                    colNames.map(c => {
+                      const v = r[c];
+                      if (v === null || v === undefined) return { type: 'null' };
+                      if (typeof v === 'number') return { type: 'integer', value: String(v) };
+                      return { type: 'text', value: String(v) };
+                    })
+                  )
+                }
+              }
+            });
+          } else {
+            if (args.length > 0) cloudDb.prepare(sql).run(...args);
+            else cloudDb.exec(sql);
+            results.push({
+              type: 'ok',
+              response: { type: 'execute', result: { cols: [], rows: [] } }
+            });
+          }
+        } catch (err) {
+          results.push({ type: 'error', error: { message: err.message } });
+        }
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ results }));
+    });
+  });
+
+  await new Promise(resolve => mockTurso.listen(0, '127.0.0.1', resolve));
+  const { port } = mockTurso.address();
+  const tursoUrl = `http://127.0.0.1:${port}`;
+
+  try {
+    // Boot #1: fresh ephemeral :memory: DB issues 2 licenses and revokes 1
+    const srv1 = await startTestServer({
+      TURSO_DATABASE_URL: tursoUrl,
+      TURSO_AUTH_TOKEN: expectedToken
+    });
+    await srv1.db.ready;
+    const lic1 = srv1.db.issueLicense({
+      email: 'kept@framevault.dev',
+      method: 'razorpay',
+      externalId: 'order_turso_1',
+      paymentIntentId: 'pay_turso_1'
+    }).license;
+    const lic2 = srv1.db.issueLicense({
+      email: 'refunded@framevault.dev',
+      method: 'razorpay',
+      externalId: 'order_turso_2',
+      paymentIntentId: 'pay_turso_2'
+    }).license;
+    srv1.db.revokeLicenseByPaymentIntent('pay_turso_2');
+    await srv1.db.flush();
+    await srv1.close();
+
+    // Boot #2: brand-new empty :memory: DB (simulating Render Free Tier wipe) hydrates from Turso
+    const srv2 = await startTestServer({
+      TURSO_DATABASE_URL: tursoUrl,
+      TURSO_AUTH_TOKEN: expectedToken
+    });
+    const hydrateInfo = await srv2.db.ready;
+    assert.equal(hydrateInfo.hydrated, true);
+    assert.equal(hydrateInfo.licenseCount, 2);
+
+    const restored1 = srv2.db.findActiveLicenseByKey(lic1.licenseKey);
+    assert.ok(restored1, 'Paid license should survive ephemeral container wipe via Turso');
+    assert.equal(restored1.email, 'kept@framevault.dev');
+
+    const restored2 = srv2.db.findActiveLicenseByKey(lic2.licenseKey);
+    assert.equal(restored2, null, 'Revoked license must remain revoked after Turso hydration');
+
+    const health = await request(srv2.baseUrl, '/api/health');
+    assert.equal(health.json.db, 'sqlite+turso');
+    assert.equal(health.json.tursoHydrated, true);
+
+    await srv2.close();
+  } finally {
+    mockTurso.close();
+    cloudDb.close();
   }
 });
