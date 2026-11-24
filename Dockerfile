@@ -3,7 +3,7 @@ FROM node:22-alpine
 WORKDIR /app
 
 # Copy application files (zero root npm dependencies — pure Node 22 built-ins + SQLite)
-COPY package.json server.js index.html app.js styles.css components-data.js ./
+COPY package.json server.js index.html app.js styles.css favicon.svg components-data.js ./
 COPY backend ./backend
 COPY designs ./designs
 COPY .agent ./.agent
