@@ -1,0 +1,535 @@
+'use client';
+
+/**
+ * Asset 17 — 3D Floating Lavender Robot Character with Expressive Visor
+ * Converted from FrameVault HTML component to TypeScript + React (.tsx)
+ */
+import React, { useEffect, useRef } from 'react';
+
+export interface Asset17Props {
+  /** Additional CSS class names for the root container */
+  className?: string;
+  /** Inline styles applied to the root container */
+  style?: React.CSSProperties;
+  /** Container width (default: '100%') */
+  width?: number | string;
+  /** Container height (default: '100%') */
+  height?: number | string;
+}
+
+const SCOPED_STYLES = `
+.fv-assets-asset-17 {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.fv-assets-asset-17 *, .fv-assets-asset-17 *::before, .fv-assets-asset-17 *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  .fv-assets-asset-17 {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #c8cfd6;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .fv-assets-asset-17 canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+  }
+`;
+
+// Scoped DOM/Window runtime adapter so WebGL/Canvas/DOM3D logic runs strictly inside this
+// component's container and cleans up all RAF loops & event listeners on React unmount.
+interface ScopedRuntimeContext {
+  root: HTMLDivElement;
+  document: Document;
+  window: Window;
+  requestAnimationFrame: (cb: FrameRequestCallback) => number;
+  cancelAnimationFrame: (id: number) => void;
+}
+
+/* eslint-disable */
+function initAsset17Runtime(__fvRuntime: ScopedRuntimeContext): void {
+  const { document, window, requestAnimationFrame, cancelAnimationFrame } = __fvRuntime as any;
+  (() => {
+    const canvas = document.getElementById('glCanvas');
+    const gl = canvas.getContext('webgl2', { antialias: true }) ||
+               canvas.getContext('webgl', { antialias: true });
+    if (!gl) return;
+  
+    const vsSource = `
+      attribute vec2 aPos;
+      varying vec2 vUv;
+      void main() {
+        vUv = aPos;
+        gl_Position = vec4(aPos, 0.0, 1.0);
+      }
+    `;
+  
+    // Raymarched 3D Cute Floating Lavender Astronaut/Robot Character on Studio Backdrop
+    // Replicating the rounded lavender helmet, side ear-pods, recessed dark-indigo visor screen,
+    // expressive glowing white LED eyes (^ ^ happy arcs, [ ] square eyes, - - blink),
+    // rounded torso, pill arms, stubby legs, cursor tracking, and elongated studio floor shadow!
+    const fsSource = `
+      precision highp float;
+      varying vec2 vUv;
+  
+      uniform vec2 uResolution;
+      uniform float uTime;
+      uniform vec2 uPointer;
+      uniform float uEyeMode;   // 0.0 = happy curved arcs (^ ^), 1.0 = glowing rounded squares ([ ])
+      uniform float uBlink;     // 0.0 = open, 1.0 = squinted/blinking (- -)
+  
+      float smin(float a, float b, float k) {
+        float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+        return mix(b, a, h) - k * h * (1.0 - h);
+      }
+  
+      float smax(float a, float b, float k) {
+        return -smin(-a, -b, k);
+      }
+  
+      float sdCapsule(vec3 p, vec3 a, vec3 b, float r) {
+        vec3 pa = p - a, ba = b - a;
+        float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+        return length(pa - ba * h) - r;
+      }
+  
+      float sdRoundBox(vec3 p, vec3 b, float r) {
+        vec3 q = abs(p) - b;
+        return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - r;
+      }
+  
+      // Transform world point into character local space
+      vec3 toCharSpace(vec3 p, out vec3 headP, out vec3 bodyP) {
+        // Character floats on the left-center of the studio frame (matching 00:00-00:15 of Asset 17)
+        float hoverX = -0.52 + uPointer.x * 0.22 + sin(uTime * 1.1) * 0.06;
+        float hoverY = -0.02 + sin(uTime * 2.1) * 0.055;
+        vec3 local = p - vec3(hoverX, hoverY, 0.0);
+  
+        // Head & body turn smoothly toward the cursor
+        float yaw = clamp((uPointer.x - (-0.35)) * 0.52, -0.55, 0.65);
+        float pitch = clamp(-uPointer.y * 0.28, -0.32, 0.32);
+  
+        // Body has 55% of head rotation
+        float bYaw = yaw * 0.55;
+        float cby = cos(-bYaw), sby = sin(-bYaw);
+        bodyP = vec3(local.x * cby + local.z * sby, local.y, -local.x * sby + local.z * cby);
+  
+        // Head pivots around neck (y = -0.05)
+        vec3 hp = local - vec3(0.0, 0.24, 0.0);
+        float cy = cos(-yaw), sy = sin(-yaw);
+        float cx = cos(pitch), sx = sin(pitch);
+        vec3 r1 = vec3(hp.x * cy + hp.z * sy, hp.y, -hp.x * sy + hp.z * cy);
+        headP = vec3(r1.x, r1.y * cx - r1.z * sx, r1.y * sx + r1.z * cx);
+  
+        return local;
+      }
+  
+      // Evaluate Character SDF and output material ID (1.0 = lavender suit, 2.0 = dark indigo visor)
+      vec2 mapCharacter(vec3 p) {
+        vec3 headP, bodyP;
+        toCharSpace(p, headP, bodyP);
+  
+        // 1. Helmet outer rounded sphere (slightly wider horizontally)
+        vec3 hs = headP / vec3(1.06, 0.98, 0.96);
+        float dHelmetOuter = (length(hs) - 0.52) * 0.96;
+  
+        // Carve recessed visor cavity on front of helmet (+Z)
+        vec3 visorCutCenter = vec3(0.0, -0.01, 0.34);
+        float dVisorCut = length((headP - visorCutCenter) / vec3(1.06, 0.98, 0.75)) - 0.42;
+        float dHelmetShell = smax(dHelmetOuter, -dVisorCut, 0.038);
+  
+        // Side ear-pods at x = +/- 0.55
+        vec3 earP = vec3(abs(headP.x) - 0.53, headP.y + 0.01, headP.z);
+        float dEars = sdRoundBox(earP, vec3(0.045, 0.11, 0.11), 0.055);
+        dHelmetShell = smin(dHelmetShell, dEars, 0.025);
+  
+        // Inner dark visor dome sitting inside the helmet recess
+        float dVisorScreen = (length(hs) - 0.455) * 0.96;
+  
+        // 2. Cute rounded Torso + two stubby Legs + two pill Arms
+        vec3 tp = bodyP - vec3(0.0, -0.42, 0.0);
+        float dTorso = sdRoundBox(tp, vec3(0.18, 0.19, 0.14), 0.12);
+  
+        // Left & right stubby legs
+        vec3 legP = vec3(abs(tp.x) - 0.115, tp.y + 0.26, tp.z);
+        float dLegs = sdCapsule(legP, vec3(0.0, 0.08, 0.0), vec3(0.0, -0.06, 0.0), 0.105);
+        float dBody = smin(dTorso, dLegs, 0.06);
+  
+        // Left & right pill arms at sides of torso
+        vec3 armP = vec3(abs(tp.x) - 0.285, tp.y - 0.01, tp.z);
+        float dArms = sdCapsule(armP, vec3(0.0, 0.07, 0.0), vec3(0.0, -0.08, 0.02), 0.065);
+        dBody = min(dBody, dArms);
+  
+        float dSuit = min(dHelmetShell, dBody);
+  
+        if (dVisorScreen < dSuit) {
+          return vec2(dVisorScreen, 2.0);
+        }
+        return vec2(dSuit, 1.0);
+      }
+  
+      float mapDist(vec3 p) {
+        return mapCharacter(p).x;
+      }
+  
+      vec3 calcNormal(vec3 p) {
+        vec2 e = vec2(0.0015, 0.0);
+        return normalize(vec3(
+          mapDist(p + e.xyy) - mapDist(p - e.xyy),
+          mapDist(p + e.yxy) - mapDist(p - e.yxy),
+          mapDist(p + e.yyx) - mapDist(p - e.yyx)
+        ));
+      }
+  
+      // 2D SDF for the glowing white LED eyes on the visor screen
+      float evalVisorEyes(vec2 uv) {
+        // Mirror X for left & right eye centered at x = +/- 0.135, y = -0.02
+        vec2 p = vec2(abs(uv.x) - 0.132, uv.y + 0.025);
+  
+        // Apply blink squash
+        float blinkScaleY = mix(1.0, 0.15, uBlink);
+  
+        // Shape A: Happy curved arc eye (^ ^) as in 00:00, 00:03, 00:06-00:10
+        vec2 arcP = p - vec2(0.0, -0.035);
+        float arcR = length(arcP);
+        float arcRing = abs(arcR - 0.068) - 0.015;
+        // Cut lower half of circle with rounded caps
+        float dArc = max(arcRing, -arcP.y);
+        float dCapL = length(arcP - vec2(-0.068, 0.0)) - 0.015;
+        float dCapR = length(arcP - vec2( 0.068, 0.0)) - 0.015;
+        dArc = min(dArc, min(dCapL, dCapR));
+  
+        // Shape B: Glowing rounded square eye ([ ]) as in 00:02, 00:05, 00:11-00:15
+        vec2 sqSize = vec2(0.072, 0.072 * blinkScaleY);
+        vec2 q = abs(p) - sqSize + 0.022;
+        float dSquare = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 0.022;
+  
+        // Shape C: Horizontal bar eye (- -) during blink (00:13)
+        vec2 bq = abs(p) - vec2(0.068, 0.012);
+        float dBar = length(max(bq, 0.0)) + min(max(bq.x, bq.y), 0.0) - 0.012;
+  
+        float dOpen = mix(dArc, dSquare, uEyeMode);
+        return mix(dOpen, dBar, uBlink);
+      }
+  
+      void main() {
+        vec2 uv = vUv;
+        uv.x *= uResolution.x / max(uResolution.y, 1.0);
+  
+        // Studio cyclorama background gradient matching Asset 17 recording
+        vec3 bgTop = vec3(0.74, 0.77, 0.80);
+        vec3 bgMid = vec3(0.84, 0.86, 0.89);
+        vec3 bgBot = vec3(0.78, 0.81, 0.84);
+        vec3 bgCol = mix(bgBot, bgMid, smoothstep(-1.0, -0.15, vUv.y));
+        bgCol = mix(bgCol, bgTop, smoothstep(-0.15, 1.0, vUv.y));
+  
+        // Long soft studio floor shadow extending from under the character to the left (00:00-00:15)
+        float hoverX = -0.52 + uPointer.x * 0.22 + sin(uTime * 1.1) * 0.06;
+        vec2 shadowUV = uv - vec2(hoverX - 0.58, -0.82);
+        float shadowEllip = length(shadowUV * vec2(0.95, 9.5));
+        float floorShadow = exp(-shadowEllip * shadowEllip * 1.65) * 0.22;
+        // Stronger contact shadow closer to character feet
+        vec2 contactUV = uv - vec2(hoverX - 0.18, -0.81);
+        float contactShadow = exp(-dot(contactUV * vec2(2.2, 12.0), contactUV * vec2(2.2, 12.0))) * 0.16;
+        bgCol *= (1.0 - floorShadow - contactShadow);
+  
+        vec3 ro = vec3(0.0, 0.0, 3.35);
+        vec3 rd = normalize(vec3(uv * 0.50, -1.0));
+  
+        float t = 0.0;
+        bool hit = false;
+        vec2 res;
+        vec3 p;
+  
+        for (int i = 0; i < 80; i++) {
+          p = ro + rd * t;
+          res = mapCharacter(p);
+          if (res.x < 0.0012) {
+            hit = true;
+            break;
+          }
+          t += res.x;
+          if (t > 5.5) break;
+        }
+  
+        if (!hit) {
+          gl_FragColor = vec4(bgCol, 1.0);
+          return;
+        }
+  
+        vec3 n = calcNormal(p);
+        vec3 v = -rd;
+  
+        vec3 headP, bodyP;
+        toCharSpace(p, headP, bodyP);
+  
+        // Soft studio 3-point lighting (key light from right-top casting shadow to left)
+        vec3 keyLight  = normalize(vec3(0.58, 0.52, 0.62));
+        vec3 fillLight = normalize(vec3(-0.62, 0.25, 0.74));
+        vec3 topLight  = normalize(vec3(0.0, 0.92, 0.38));
+  
+        float diffKey  = max(0.0, dot(n, keyLight));
+        float diffFill = max(0.0, dot(n, fillLight));
+        float diffTop  = max(0.0, dot(n, topLight));
+  
+        // Quick 2-step ambient occlusion for neck/visor/arm crevices
+        float ao = clamp(0.5 + 0.5 * (mapDist(p + n * 0.06) / 0.06), 0.35, 1.0);
+  
+        if (res.y < 1.5) {
+          // Material 1: Matte soft lavender-purple suit (#7d68d8)
+          vec3 shadowPurple = vec3(0.35, 0.28, 0.66);
+          vec3 baseLavender = vec3(0.51, 0.42, 0.85);
+          vec3 litLavender  = vec3(0.66, 0.58, 0.95);
+  
+          float lambert = clamp(diffKey * 0.75 + diffFill * 0.28 + diffTop * 0.25, 0.0, 1.0);
+          vec3 col = mix(shadowPurple, baseLavender, smoothstep(0.0, 0.65, lambert));
+          col = mix(col, litLavender, smoothstep(0.55, 1.0, lambert));
+          col *= mix(0.52, 1.0, ao);
+  
+          // Soft matte rim sheen
+          float fresnel = pow(1.0 - max(0.0, dot(n, v)), 3.0);
+          col += vec3(0.75, 0.70, 0.98) * fresnel * 0.18;
+  
+          gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+        } else {
+          // Material 2: Deep navy-indigo visor screen with glowing white LED eyes + bloom
+          vec3 visorBase = vec3(0.045, 0.052, 0.175);
+          float fresnel = pow(1.0 - max(0.0, dot(n, v)), 2.8);
+          vec3 col = visorBase + vec3(0.14, 0.16, 0.38) * fresnel * 0.55;
+  
+          // Evaluate glowing white LED eyes in head-local XY coordinates
+          float dEye = evalVisorEyes(headP.xy);
+          float eyeCore = 1.0 - smoothstep(-0.003, 0.005, dEye);
+          float eyeBloom1 = exp(-max(0.0, dEye) * 26.0) * 0.62;
+          float eyeBloom2 = exp(-max(0.0, dEye) * 9.5) * 0.28;
+  
+          col += vec3(0.58, 0.65, 1.00) * (eyeBloom1 + eyeBloom2);
+          col = mix(col, vec3(1.0, 1.0, 1.0), eyeCore);
+  
+          gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+        }
+      }
+    `;
+  
+    function compile(type: any, src?: any) {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      return s;
+    }
+  
+    const prog = gl.createProgram();
+    gl.attachShader(prog, compile(gl.VERTEX_SHADER, vsSource));
+    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fsSource));
+    gl.linkProgram(prog);
+    gl.useProgram(prog);
+  
+    const quad = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+      gl.STATIC_DRAW
+    );
+  
+    const aPos = gl.getAttribLocation(prog, 'aPos');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+  
+    const uResolution = gl.getUniformLocation(prog, 'uResolution');
+    const uTime = gl.getUniformLocation(prog, 'uTime');
+    const uPointer = gl.getUniformLocation(prog, 'uPointer');
+    const uEyeMode = gl.getUniformLocation(prog, 'uEyeMode');
+    const uBlink = gl.getUniformLocation(prog, 'uBlink');
+  
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(window.innerWidth * dpr);
+      canvas.height = Math.round(window.innerHeight * dpr);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+  
+    let ptrX = -0.35;
+    let ptrY = -0.15;
+    let targetX = -0.35;
+    let targetY = -0.15;
+    let eyeMode = 0.0;
+    let targetEyeMode = 0.0;
+    let manualToggle = false;
+  
+    window.addEventListener('pointermove', (e: any) => {
+      targetX = (e.clientX / Math.max(window.innerWidth, 1)) * 2 - 1;
+      targetY = 1 - (e.clientY / Math.max(window.innerHeight, 1)) * 2;
+    });
+  
+    window.addEventListener('pointerdown', () => {
+      manualToggle = !manualToggle;
+      targetEyeMode = manualToggle ? 1.0 : 0.0;
+    });
+  
+    function render(now?: any) {
+      const t = now * 0.001;
+  
+      ptrX += (targetX - ptrX) * 0.07;
+      ptrY += (targetY - ptrY) * 0.07;
+  
+      // Automatically cycle between happy curved eyes (^ ^) and glowing square eyes ([ ])
+      // just like 00:00 -> 00:02 -> 00:06 -> 00:11 -> 00:13 in the recording!
+      const cycle = t % 9.0;
+      if (!manualToggle) {
+        targetEyeMode = ((cycle > 1.8 && cycle < 3.4) || (cycle > 6.2 && cycle < 8.6)) ? 1.0 : 0.0;
+      }
+      eyeMode += (targetEyeMode - eyeMode) * 0.16;
+  
+      // Periodic crisp blink (- -)
+      const blinkCycle = t % 4.2;
+      const blink = (blinkCycle > 3.92 && blinkCycle < 4.12) ? 1.0 : 0.0;
+  
+      gl.uniform2f(uResolution, canvas.width, canvas.height);
+      gl.uniform1f(uTime, t);
+      gl.uniform2f(uPointer, ptrX, ptrY);
+      gl.uniform1f(uEyeMode, eyeMode);
+      gl.uniform1f(uBlink, blink);
+  
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      requestAnimationFrame(render);
+    }
+  
+    requestAnimationFrame(render);
+  })();
+}
+/* eslint-enable */
+
+export function Asset17({ className, style, width = '100%', height = '100%' }: Asset17Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+
+    let disposed = false;
+    const rafIds = new Set<number>();
+    const cleanups: Array<() => void> = [];
+    const resizeCallbacks = new Set<() => void>();
+
+    const scopedRaf = (cb: FrameRequestCallback): number => {
+      if (disposed) return 0;
+      const id = window.requestAnimationFrame((ts: number) => {
+        rafIds.delete(id);
+        if (!disposed) cb(ts);
+      });
+      rafIds.add(id);
+      return id;
+    };
+
+    const scopedCaf = (id: number): void => {
+      rafIds.delete(id);
+      window.cancelAnimationFrame(id);
+    };
+
+    const scopedDoc = new Proxy(document, {
+      get(target, prop) {
+        if (prop === 'body' || prop === 'documentElement') return root;
+        if (prop === 'getElementById') {
+          return (id: string) =>
+            root.querySelector(`#${CSS.escape(id)}`) || target.getElementById(id);
+        }
+        if (prop === 'querySelector') {
+          return (sel: string) => root.querySelector(sel);
+        }
+        if (prop === 'querySelectorAll') {
+          return (sel: string) => root.querySelectorAll(sel);
+        }
+        if (prop === 'addEventListener') {
+          return (type: string, listener: EventListenerOrEventListenerObject, opts?: boolean | AddEventListenerOptions) => {
+            target.addEventListener(type, listener, opts);
+            cleanups.push(() => target.removeEventListener(type, listener, opts));
+          };
+        }
+        const val = Reflect.get(target, prop);
+        return typeof val === 'function' ? val.bind(target) : val;
+      }
+    }) as Document;
+
+    const scopedWin = new Proxy(window, {
+      get(target, prop) {
+        if (prop === 'innerWidth') return root.clientWidth || target.innerWidth;
+        if (prop === 'innerHeight') return root.clientHeight || target.innerHeight;
+        if (prop === 'requestAnimationFrame') return scopedRaf;
+        if (prop === 'cancelAnimationFrame') return scopedCaf;
+        if (prop === 'addEventListener') {
+          return (type: string, listener: EventListenerOrEventListenerObject, opts?: boolean | AddEventListenerOptions) => {
+            if (type === 'resize' && typeof listener === 'function') {
+              resizeCallbacks.add(listener as () => void);
+            }
+            const host: EventTarget =
+              type === 'pointerdown' || type === 'mousedown' || type === 'touchstart' || type === 'wheel'
+                ? root
+                : target;
+            host.addEventListener(type, listener, opts);
+            cleanups.push(() => host.removeEventListener(type, listener, opts));
+          };
+        }
+        const val = Reflect.get(target, prop);
+        return typeof val === 'function' ? val.bind(target) : val;
+      }
+    }) as Window;
+
+    const ro = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => {
+          if (disposed) return;
+          resizeCallbacks.forEach(fn => {
+            try { fn(); } catch { /* ignore */ }
+          });
+        })
+      : null;
+    ro?.observe(root);
+
+    initAsset17Runtime({
+      root,
+      document: scopedDoc,
+      window: scopedWin,
+      requestAnimationFrame: scopedRaf,
+      cancelAnimationFrame: scopedCaf
+    });
+
+    return () => {
+      disposed = true;
+      ro?.disconnect();
+      resizeCallbacks.clear();
+      rafIds.forEach(id => window.cancelAnimationFrame(id));
+      rafIds.clear();
+      cleanups.forEach(fn => {
+        try { fn(); } catch { /* ignore */ }
+      });
+      cleanups.length = 0;
+    };
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      className={className ? `fv-assets-asset-17 ${className}` : 'fv-assets-asset-17'}
+      style={{ width, height, ...style }}
+    >
+      <style dangerouslySetInnerHTML={{ __html: SCOPED_STYLES }} />
+        <canvas id="glCanvas"></canvas>
+    </div>
+  );
+}
+
+export default Asset17;

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEON ARCHIVE N°06</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #ededed;
+      color: #181818;
+      font-family: 'Inter', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .top-right-label {
+      position: fixed;
+      top: 32px;
+      right: 40px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: #222;
+      z-index: 40;
+      pointer-events: none;
+    }
+
+    .bottom-right-label {
+      position: fixed;
+      bottom: 24px;
+      right: 32px;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      color: #666;
+      z-index: 40;
+      pointer-events: none;
+    }
+
+    .viewport {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: grab;
+      touch-action: none;
+      overflow: hidden;
+    }
+
+    .viewport:active {
+      cursor: grabbing;
+    }
+
+    .stack-stage {
+      position: relative;
+      width: 0;
+      height: 0;
+    }
+
+    .diag-card {
+      position: absolute;
+      width: 260px;
+      height: 330px;
+      margin-left: -130px;
+      margin-top: -165px;
+      transform-origin: center center;
+      will-change: transform, opacity, filter;
+    }
+
+    /* RGB Chromatic Ghost Layers (visible when card accelerates to top-left) */
+    .ghost-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0;
+      mix-blend-mode: screen;
+      will-change: transform, opacity;
+    }
+
+    .ghost-cyan {
+      background: #00f0ff;
+    }
+
+    .ghost-magenta {
+      background: #ff006a;
+    }
+
+    .card-main {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #111;
+      box-shadow: 0 18px 42px rgba(0, 0, 0, 0.16);
+    }
+
+    .card-main img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      pointer-events: none;
+      image-rendering: -webkit-optimize-contrast;
+      transform: translateZ(0);
+    }
+
+    /* Subtle editorial typography overlay matching Neon Archive N°06 */
+    .card-meta-top {
+      position: absolute;
+      top: 14px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: rgba(255, 255, 255, 0.9);
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+      pointer-events: none;
+    }
+
+    .card-jp-badge {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      font-family: 'Noto Sans JP', sans-serif;
+      font-size: 32px;
+      font-weight: 900;
+      line-height: 1.05;
+      color: #ffffff;
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.65);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="top-right-label">NEON ARCHIVE N°06</div>
+  <div class="bottom-right-label">35.202° N / 139.692° E</div>
+
+  <div class="viewport" id="viewport">
+    <div class="stack-stage" id="stage"></div>
+  </div>
+
+  <script>
+    const SLIDES = [
+      { src: 'images/1.jpg', tag: 'LIGHT STUDIES', num: '01', jp: '光の\n速さで' },
+      { src: 'images/2.jpg', tag: 'NIGHT SERIES', num: '02', jp: '夜明け' },
+      { src: 'images/3.jpg', tag: 'SHOWCASE', num: '03', jp: '東京\n大阪' },
+      { src: 'images/4.jpg', tag: 'ARCHIVE', num: '04', jp: '風' },
+      { src: 'images/5.jpg', tag: 'DEEP BLUE', num: '05', jp: '海流' },
+      { src: 'images/6.jpg', tag: 'VISION', num: '06', jp: '視点' },
+      { src: 'images/7.jpg', tag: 'HORIZON', num: '07', jp: '静寂' },
+      { src: 'images/8.jpg', tag: 'BOTANICAL', num: '08', jp: '緑陰' },
+      { src: 'images/9.jpg', tag: 'LUNAR', num: '09', jp: '月光' },
+      { src: 'images/10.jpg', tag: 'BLOSSOM', num: '10', jp: '花' },
+      { src: 'images/11.jpg', tag: 'AUTUMN', num: '11', jp: '紅葉' },
+      { src: 'images/12.jpg', tag: 'WILDLIFE', num: '12', jp: '星' }
+    ];
+
+    const stage = document.getElementById('stage');
+    const viewport = document.getElementById('viewport');
+
+    const TOTAL = SLIDES.length;
+    const cards = [];
+
+    SLIDES.forEach((slide, i) => {
+      const el = document.createElement('div');
+      el.className = 'diag-card';
+      el.innerHTML = `
+        <div class="ghost-layer ghost-cyan"></div>
+        <div class="ghost-layer ghost-magenta"></div>
+        <div class="card-main">
+          <img src="${slide.src}" alt="Archive ${slide.num}" loading="eager" decoding="sync" fetchpriority="high">
+          <div class="card-meta-top">
+            <span>${slide.tag}</span>
+            <span>${slide.num}</span>
+          </div>
+          <div class="card-jp-badge">${slide.jp.replace('\n', '<br>')}</div>
+        </div>
+      `;
+      stage.appendChild(el);
+      cards.push({
+        el,
+        cyan: el.querySelector('.ghost-cyan'),
+        magenta: el.querySelector('.ghost-magenta'),
+        index: i
+      });
+    });
+
+    let progress = 0;
+    let targetProgress = 0;
+    let isDragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    let lastTime = 0;
+    let velocity = 0;
+    let autoPlay = true;
+
+    function renderDiagonalStack() {
+      if (autoPlay && !isDragging) {
+        targetProgress += 0.0055;
+      }
+
+      if (!isDragging) {
+        progress += (targetProgress - progress) * 0.11;
+      } else {
+        progress = targetProgress;
+      }
+
+      cards.forEach(({ el, cyan, magenta, index }) => {
+        // Compute wrapped distance from active center card [-TOTAL/2, +TOTAL/2]
+        let delta = (index - progress) % TOTAL;
+        if (delta < -TOTAL / 2) delta += TOTAL;
+        if (delta > TOTAL / 2) delta -= TOTAL;
+
+        // Visible range along the diagonal: from -2.2 (top-left exit) to +3.2 (bottom-right entry)
+        if (delta < -2.3 || delta > 3.3) {
+          el.style.opacity = '0';
+          el.style.pointerEvents = 'none';
+          return;
+        }
+
+        // Diagonal trajectory:
+        // delta > 0 is bottom-right; delta = 0 is dead center; delta < 0 is top-left
+        const x = delta * 245;
+        const y = delta * 155;
+
+        // Rotation:
+        // Center card (delta = 0) is upright (0 deg).
+        // Cards at bottom-right and top-left tilt counter-clockwise (-24 deg) matching the video!
+        const distFromCenter = Math.min(1, Math.abs(delta));
+        let rot = 0;
+        if (delta > 0) {
+          rot = -21 * Math.pow(Math.min(1, delta / 1.1), 0.85);
+        } else {
+          rot = -32 * Math.pow(Math.min(1, -delta / 1.1), 0.85);
+        }
+
+        // Scale & chromatic aberration when exiting toward top-left (delta < -0.25)
+        let scale = 1;
+        let blurPx = 0;
+        let ghostAmt = 0;
+
+        if (delta < -0.2) {
+          const exitFactor = Math.min(1.5, Math.abs(delta + 0.2));
+          scale = 1 + exitFactor * 0.26;
+          blurPx = exitFactor * 3.2;
+          ghostAmt = Math.min(0.75, exitFactor * 0.65);
+        }
+
+        const opacity = delta < -1.5 ? Math.max(0, 1 - (-delta - 1.5) * 1.4) : 1;
+
+        el.style.opacity = opacity.toFixed(3);
+        el.style.pointerEvents = opacity > 0.2 ? 'auto' : 'none';
+        el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) rotate(${rot.toFixed(2)}deg) scale(${scale.toFixed(3)})`;
+        el.style.filter = blurPx > 0.2 ? `blur(${blurPx.toFixed(2)}px)` : 'none';
+        // Cards exiting to top-left stack on top of earlier ones just like the video
+        el.style.zIndex = Math.round(100 - delta * 15);
+
+        if (ghostAmt > 0.02) {
+          cyan.style.opacity = ghostAmt.toFixed(2);
+          cyan.style.transform = `translate3d(${(ghostAmt * 18).toFixed(1)}px, ${(-ghostAmt * 12).toFixed(1)}px, 0)`;
+          magenta.style.opacity = (ghostAmt * 0.85).toFixed(2);
+          magenta.style.transform = `translate3d(${(-ghostAmt * 16).toFixed(1)}px, ${(ghostAmt * 10).toFixed(1)}px, 0)`;
+        } else {
+          cyan.style.opacity = '0';
+          magenta.style.opacity = '0';
+        }
+      });
+
+      requestAnimationFrame(renderDiagonalStack);
+    }
+
+    viewport.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      autoPlay = false;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      lastTime = performance.now();
+      velocity = 0;
+      viewport.setPointerCapture(e.pointerId);
+    });
+
+    viewport.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const now = performance.now();
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      const dt = Math.max(1, now - lastTime);
+
+      const dProg = (-dx * 0.0032) + (-dy * 0.0022);
+      targetProgress += dProg;
+      velocity = dProg / dt;
+
+      lastX = e.clientX;
+      lastY = e.clientY;
+      lastTime = now;
+    });
+
+    function endDrag() {
+      if (!isDragging) return;
+      isDragging = false;
+      targetProgress += velocity * 150;
+      targetProgress = Math.round(targetProgress);
+      setTimeout(() => {
+        if (!isDragging) autoPlay = true;
+      }, 2200);
+    }
+
+    viewport.addEventListener('pointerup', endDrag);
+    viewport.addEventListener('pointercancel', endDrag);
+
+    window.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      autoPlay = false;
+      targetProgress += (e.deltaY || e.deltaX) * 0.0025;
+      clearTimeout(window._diagTimer);
+      window._diagTimer = setTimeout(() => {
+        targetProgress = Math.round(targetProgress);
+        autoPlay = true;
+      }, 1500);
+    }, { passive: false });
+
+    window.addEventListener('keydown', (e) => {
+      autoPlay = false;
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') targetProgress = Math.round(targetProgress) - 1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') targetProgress = Math.round(targetProgress) + 1;
+    });
+
+    requestAnimationFrame(renderDiagonalStack);
+  </script>
+</body>
+</html>

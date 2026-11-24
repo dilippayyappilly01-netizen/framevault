@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Radial Arch Carousel — Drag to Rotate</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #ededed;
+      color: #222;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .viewport {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      cursor: grab;
+      touch-action: none;
+      overflow: hidden;
+    }
+
+    .viewport:active {
+      cursor: grabbing;
+    }
+
+    /* Pivot of the circular arch sits below center so the top arc sits in the middle of the screen */
+    .arch-pivot {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate3d(0, 290px, 0);
+      width: 0;
+      height: 0;
+    }
+
+    .arch-card {
+      position: absolute;
+      width: 146px;
+      height: 196px;
+      margin-left: -73px;
+      margin-top: -98px;
+      border-radius: 18px;
+      overflow: hidden;
+      background: #1a2a4a;
+      box-shadow: 0 16px 34px rgba(0, 0, 0, 0.16), 0 3px 8px rgba(0, 0, 0, 0.08);
+      will-change: transform, opacity;
+      transform-origin: center center;
+    }
+
+    .arch-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      pointer-events: none;
+      image-rendering: -webkit-optimize-contrast;
+      transform: translateZ(0);
+    }
+
+    /* Small dark pill badge in bottom-left of each card matching the recording */
+    .num-badge {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(12, 18, 30, 0.78);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      color: #ffffff;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 3px 6px;
+      border-radius: 5px;
+      pointer-events: none;
+    }
+
+    /* Soft gradient fade mask along the bottom of the arch */
+    .arch-fade-mask {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 56%;
+      height: 220px;
+      background: linear-gradient(180deg, rgba(237, 237, 237, 0) 0%, #ededed 58%, #ededed 100%);
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    .drag-label {
+      position: fixed;
+      top: 67.5%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #666;
+      z-index: 30;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="viewport" id="viewport">
+    <div class="arch-pivot" id="pivot"></div>
+    <div class="arch-fade-mask"></div>
+  </div>
+
+  <div class="drag-label">DRAG TO ROTATE</div>
+
+  <script>
+    const IMAGES = [
+      'images/1.jpg',
+      'images/2.jpg',
+      'images/3.jpg',
+      'images/4.jpg',
+      'images/5.jpg',
+      'images/6.jpg',
+      'images/7.jpg',
+      'images/8.jpg',
+      'images/9.jpg',
+      'images/10.jpg',
+      'images/11.jpg',
+      'images/12.jpg'
+    ];
+
+    const pivot = document.getElementById('pivot');
+    const viewport = document.getElementById('viewport');
+
+    const TOTAL = IMAGES.length; // 12 cards
+    const STEP_DEG = 29;         // 29 deg between adjacent cards on the arch
+    const RADIUS = 350;          // Arch radius in px
+    const cards = [];
+
+    IMAGES.forEach((src, i) => {
+      const el = document.createElement('div');
+      el.className = 'arch-card';
+      const numStr = String(i + 1).padStart(2, '0');
+      el.innerHTML = `
+        <img src="${src}" alt="Card ${numStr}" loading="eager" decoding="sync" fetchpriority="high">
+        <div class="num-badge">${numStr}</div>
+      `;
+      pivot.appendChild(el);
+      cards.push({ el, index: i });
+    });
+
+    let currentIndex = 0;
+    let targetIndex = 0;
+    let isDragging = false;
+    let lastX = 0;
+    let lastTime = 0;
+    let velocity = 0;
+    let autoRotate = true;
+
+    function renderArch() {
+      if (autoRotate && !isDragging) {
+        targetIndex += 0.0045;
+      }
+
+      if (!isDragging) {
+        currentIndex += (targetIndex - currentIndex) * 0.11;
+      } else {
+        currentIndex = targetIndex;
+      }
+
+      cards.forEach(({ el, index }) => {
+        // Compute shortest circular index offset from apex [-TOTAL/2, +TOTAL/2]
+        let delta = (index - currentIndex) % TOTAL;
+        if (delta < -TOTAL / 2) delta += TOTAL;
+        if (delta > TOTAL / 2) delta -= TOTAL;
+
+        const angleDeg = delta * STEP_DEG;
+        if (Math.abs(angleDeg) > 85) {
+          el.style.opacity = '0';
+          el.style.pointerEvents = 'none';
+          return;
+        }
+
+        const rad = (angleDeg * Math.PI) / 180;
+        const x = RADIUS * Math.sin(rad);
+        const y = -RADIUS * Math.cos(rad);
+
+        // Smooth fade at the extreme left and right ends of the arch
+        const fade = Math.max(0, 1 - Math.pow(Math.abs(angleDeg) / 76, 3.2));
+
+        el.style.opacity = fade.toFixed(3);
+        el.style.pointerEvents = fade > 0.2 ? 'auto' : 'none';
+        el.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) rotate(${angleDeg.toFixed(2)}deg)`;
+        el.style.zIndex = Math.round(100 - Math.abs(delta) * 10);
+      });
+
+      requestAnimationFrame(renderArch);
+    }
+
+    viewport.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      autoRotate = false;
+      lastX = e.clientX;
+      lastTime = performance.now();
+      velocity = 0;
+      viewport.setPointerCapture(e.pointerId);
+    });
+
+    viewport.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const now = performance.now();
+      const dx = e.clientX - lastX;
+      const dt = Math.max(1, now - lastTime);
+
+      const dIdx = -dx / 150;
+      targetIndex += dIdx;
+      velocity = dIdx / dt;
+
+      lastX = e.clientX;
+      lastTime = now;
+    });
+
+    function endDrag() {
+      if (!isDragging) return;
+      isDragging = false;
+      targetIndex += velocity * 140;
+      setTimeout(() => {
+        if (!isDragging) autoRotate = true;
+      }, 2000);
+    }
+
+    viewport.addEventListener('pointerup', endDrag);
+    viewport.addEventListener('pointercancel', endDrag);
+
+    window.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      autoRotate = false;
+      targetIndex += (e.deltaX || e.deltaY) * 0.003;
+      clearTimeout(window._archTimer);
+      window._archTimer = setTimeout(() => { autoRotate = true; }, 2000);
+    }, { passive: false });
+
+    window.addEventListener('keydown', (e) => {
+      autoRotate = false;
+      if (e.key === 'ArrowLeft') targetIndex -= 1;
+      if (e.key === 'ArrowRight') targetIndex += 1;
+    });
+
+    requestAnimationFrame(renderArch);
+  </script>
+</body>
+</html>

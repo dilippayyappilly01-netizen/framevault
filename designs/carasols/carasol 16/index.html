@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Panoramic Room Cube Carousel</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #000000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .viewport {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      perspective: 520px;
+      perspective-origin: 50% 50%;
+      cursor: grab;
+      touch-action: none;
+      overflow: hidden;
+    }
+
+    .viewport:active {
+      cursor: grabbing;
+    }
+
+    /* Camera sits inside the 3D room looking outward at the walls */
+    .room-camera {
+      position: relative;
+      width: 0;
+      height: 0;
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+
+    .room-wall {
+      position: absolute;
+      width: 960px;
+      height: 540px;
+      margin-left: -480px;
+      margin-top: -270px;
+      overflow: hidden;
+      background: #080808;
+      border-left: 4px solid #000;
+      border-right: 4px solid #000;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      transform-style: preserve-3d;
+    }
+
+    .room-wall img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      pointer-events: none;
+      image-rendering: high-quality;
+      image-rendering: -webkit-optimize-contrast;
+      transform: translateZ(0);
+    }
+
+    /* Optional psychedelic liquid SVG filter toggle matching the recording */
+    body.psychedelic-mode .room-wall img {
+      filter: url(#liquidPsyFilter) saturate(2.1) contrast(1.25);
+    }
+
+    .ui-controls {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      display: flex;
+      gap: 8px;
+      z-index: 40;
+    }
+
+    .ui-btn {
+      height: 34px;
+      padding: 0 11px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.14);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .ui-btn:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    .ui-btn svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+    }
+  </style>
+</head>
+<body class="psychedelic-mode">
+
+  <!-- Dynamic SVG Displacement Filter for optional Liquid Wave Mode -->
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <filter id="liquidPsyFilter" x="-10%" y="-10%" width="120%" height="120%">
+        <feTurbulence id="turbNode" type="turbulence" baseFrequency="0.012 0.025" numOctaves="2" result="warp" />
+        <feDisplacementMap in="SourceGraphic" in2="warp" scale="28" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </defs>
+  </svg>
+
+  <div class="ui-controls">
+    <button class="ui-btn" id="fxBtn" title="Toggle Liquid Distortion Effect">FX: LIQUID SHADER</button>
+    <button class="ui-btn" id="pauseBtn" title="Pause / Resume Rotation">
+      <svg viewBox="0 0 24 24" id="pauseIcon">
+        <line x1="9" y1="6" x2="9" y2="18"></line>
+        <line x1="15" y1="6" x2="15" y2="18"></line>
+      </svg>
+    </button>
+  </div>
+
+  <div class="viewport" id="viewport">
+    <div class="room-camera" id="camera"></div>
+  </div>
+
+  <script>
+    const IMAGES = [
+      'images/1.jpg',
+      'images/2.jpg',
+      'images/3.jpg',
+      'images/4.jpg',
+      'images/5.jpg',
+      'images/6.jpg',
+      'images/7.jpg',
+      'images/8.jpg',
+      'images/9.jpg',
+      'images/10.jpg',
+      'images/11.jpg',
+      'images/12.jpg'
+    ];
+
+    const camera = document.getElementById('camera');
+    const viewport = document.getElementById('viewport');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const pauseIcon = document.getElementById('pauseIcon');
+    const fxBtn = document.getElementById('fxBtn');
+    const turbNode = document.getElementById('turbNode');
+
+    // 4 interior walls forming a square 3D room (960px wide each -> apothem = 480px)
+    // As the room rotates, walls behind the viewer cycle through all 12 high-res photos!
+    const WALL_APOTHEM = 478;
+    const wallConfigs = [
+      { rotY: 0,   tx: 0,             tz: -WALL_APOTHEM }, // Front wall (North)
+      { rotY: -90, tx: WALL_APOTHEM,  tz: 0 },             // Right wall (East)
+      { rotY: 180, tx: 0,             tz: WALL_APOTHEM },  // Back wall (South)
+      { rotY: 90,  tx: -WALL_APOTHEM, tz: 0 }              // Left wall (West)
+    ];
+
+    const walls = wallConfigs.map((cfg, idx) => {
+      const el = document.createElement('div');
+      el.className = 'room-wall';
+      el.style.transform = `translate3d(${cfg.tx}px, 0, ${cfg.tz}px) rotateY(${cfg.rotY}deg)`;
+      const img = document.createElement('img');
+      img.src = IMAGES[idx % IMAGES.length];
+      img.loading = 'eager';
+      img.decoding = 'sync';
+      img.fetchPriority = 'high';
+      el.appendChild(img);
+      camera.appendChild(el);
+      return { el, img, cfg, currentPhotoIdx: idx };
+    });
+
+    let yaw = -25;
+    let targetYaw = -25;
+    let isPaused = false;
+    let isDragging = false;
+    let lastX = 0;
+    let lastTime = 0;
+    let velocity = 0;
+    let phase = 0;
+
+    function renderRoom() {
+      phase += 0.008;
+      if (document.body.classList.contains('psychedelic-mode')) {
+        const bfX = 0.01 + Math.sin(phase) * 0.004;
+        const bfY = 0.022 + Math.cos(phase * 0.8) * 0.006;
+        turbNode.setAttribute('baseFrequency', `${bfX.toFixed(4)} ${bfY.toFixed(4)}`);
+      }
+
+      if (!isDragging && !isPaused) {
+        targetYaw -= 0.32;
+      }
+
+      if (!isDragging) {
+        yaw += (targetYaw - yaw) * 0.1;
+      } else {
+        yaw = targetYaw;
+      }
+
+      // Move camera slightly backward (`translateZ(180px)`) so we see the front wall plus left & right side walls just like the video!
+      camera.style.transform = `translate3d(0, 0, 165px) rotateY(${yaw.toFixed(2)}deg)`;
+
+      // Seamless photo cycling on the wall currently behind the camera so all 12 photos appear as you turn
+      const quarterTurns = Math.floor(-yaw / 90);
+      walls.forEach((w, wallIdx) => {
+        const turnCycle = Math.floor((quarterTurns - wallIdx + 2) / 4);
+        const photoIdx = (((wallIdx + turnCycle * 4) % IMAGES.length) + IMAGES.length) % IMAGES.length;
+        if (w.currentPhotoIdx !== photoIdx) {
+          w.currentPhotoIdx = photoIdx;
+          w.img.src = IMAGES[photoIdx];
+        }
+      });
+
+      requestAnimationFrame(renderRoom);
+    }
+
+    viewport.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      lastX = e.clientX;
+      lastTime = performance.now();
+      velocity = 0;
+      viewport.setPointerCapture(e.pointerId);
+    });
+
+    viewport.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const now = performance.now();
+      const dx = e.clientX - lastX;
+      const dt = Math.max(1, now - lastTime);
+
+      const dYaw = dx * 0.25;
+      targetYaw += dYaw;
+      velocity = dYaw / dt;
+
+      lastX = e.clientX;
+      lastTime = now;
+    });
+
+    function endDrag() {
+      if (!isDragging) return;
+      isDragging = false;
+      targetYaw += velocity * 150;
+    }
+
+    viewport.addEventListener('pointerup', endDrag);
+    viewport.addEventListener('pointercancel', endDrag);
+
+    window.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      targetYaw -= (e.deltaX || e.deltaY) * 0.12;
+    }, { passive: false });
+
+    pauseBtn.addEventListener('click', () => {
+      isPaused = !isPaused;
+      if (isPaused) {
+        pauseIcon.innerHTML = `<polygon points="8 5 19 12 8 19 8 5" fill="currentColor"></polygon>`;
+      } else {
+        pauseIcon.innerHTML = `<line x1="9" y1="6" x2="9" y2="18"></line><line x1="15" y1="6" x2="15" y2="18"></line>`;
+      }
+    });
+
+    fxBtn.addEventListener('click', () => {
+      document.body.classList.toggle('psychedelic-mode');
+      const isPsy = document.body.classList.contains('psychedelic-mode');
+      fxBtn.textContent = isPsy ? 'FX: LIQUID SHADER' : 'FX: HD PHOTO';
+    });
+
+    requestAnimationFrame(renderRoom);
+  </script>
+</body>
+</html>

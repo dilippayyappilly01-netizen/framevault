@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D SPIRAL FLUX — Archive N° 08</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #ededed;
+      color: #1a1a1a;
+      font-family: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Top Header */
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      padding: 26px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #222;
+      z-index: 50;
+      pointer-events: none;
+    }
+
+    .header-plus {
+      font-size: 15px;
+      font-weight: 400;
+      color: #444;
+    }
+
+    /* Bottom Footer */
+    footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      padding: 26px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #333;
+      z-index: 50;
+      pointer-events: none;
+    }
+
+    .footer-photos {
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: none;
+      font-size: 12px;
+      color: #222;
+    }
+
+    /* 3D Helical Spiral Viewport */
+    .spiral-viewport {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      perspective: 1350px;
+      perspective-origin: 50% 50%;
+      cursor: grab;
+      touch-action: none;
+      overflow: hidden;
+    }
+
+    .spiral-viewport:active {
+      cursor: grabbing;
+    }
+
+    .helix-stage {
+      position: relative;
+      width: 0;
+      height: 0;
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+
+    /* High-Resolution Spiral Photo Cards with Clean Spacing */
+    .spiral-card {
+      position: absolute;
+      width: 236px;
+      height: 154px;
+      margin-left: -118px;
+      margin-top: -77px;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #dcdcdc;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.13), 0 2px 6px rgba(0, 0, 0, 0.05);
+      transform-style: preserve-3d;
+      will-change: transform, opacity;
+      transition: box-shadow 0.25s ease;
+    }
+
+    .spiral-card:hover {
+      box-shadow: 0 22px 48px rgba(0, 0, 0, 0.2);
+    }
+
+    .spiral-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      pointer-events: none;
+      image-rendering: high-quality;
+      image-rendering: -webkit-optimize-contrast;
+      transform: translateZ(0);
+    }
+
+    .card-badge {
+      position: absolute;
+      bottom: 8px;
+      right: 10px;
+      background: rgba(15, 15, 15, 0.62);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      color: #ffffff;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      padding: 3px 7px;
+      border-radius: 3px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div>• 3D SPIRAL FLUX •</div>
+    <div class="header-plus">+</div>
+    <div>ARCHIVE — N° 08 &nbsp;⊕</div>
+  </header>
+
+  <!-- 3D Cylindrical Spiral Viewport -->
+  <div class="spiral-viewport" id="viewport">
+    <div class="helix-stage" id="helixStage"></div>
+  </div>
+
+  <!-- Bottom Footer -->
+  <footer>
+    <div>• 35.6762° N 139.6503° E</div>
+    <div class="footer-photos">/12 Photos</div>
+    <div>MOTION STUDY / SS 2026 &nbsp;⊙</div>
+  </footer>
+
+  <script>
+    const IMAGES = [
+      'images/1.jpg',
+      'images/2.jpg',
+      'images/3.jpg',
+      'images/4.jpg',
+      'images/5.jpg',
+      'images/6.jpg',
+      'images/7.jpg',
+      'images/8.jpg',
+      'images/9.jpg',
+      'images/10.jpg',
+      'images/11.jpg',
+      'images/12.jpg'
+    ];
+
+    const helixStage = document.getElementById('helixStage');
+    const viewport = document.getElementById('viewport');
+
+    const UNIQUE_COUNT = IMAGES.length; // 12 high-res photos
+    const TOTAL_CARDS = 24;             // 2 full sets preloaded in GPU memory (no dynamic src swapping)
+    const cards = [];
+
+    for (let i = 0; i < TOTAL_CARDS; i++) {
+      const photoIdx = i % UNIQUE_COUNT;
+      const numStr = String(photoIdx + 1).padStart(2, '0');
+      const el = document.createElement('div');
+      el.className = 'spiral-card';
+      el.innerHTML = `
+        <img src="${IMAGES[photoIdx]}" alt="Spiral Photo ${numStr}" loading="eager" decoding="sync" fetchpriority="high">
+        <div class="card-badge">N° ${numStr}</div>
+      `;
+      helixStage.appendChild(el);
+      cards.push({ el, index: i });
+    }
+
+    // 3D Helix Geometry tuned for generous, uniform gaps between every picture:
+    // Card size is 236x154.
+    // With RADIUS = 420 and ANGLE_STEP = 0.76 rad (~43.5 deg), chord spacing is ~312px (leaving a ~76px gap along the arc).
+    // With VERTICAL_STEP = 96px per card, each full 360° turn rises ~795px vertically so turns never overlap!
+    const RADIUS = 420;
+    const ANGLE_STEP = 0.76;
+    const VERTICAL_STEP = 96;
+    const HELIX_SLOPE_DEG = -8.5;
+
+    let currentOffset = 0;
+    let targetOffset = 0;
+    let isDragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    let lastTime = 0;
+    let velocity = 0;
+
+    function renderSpiral() {
+      if (!isDragging) {
+        currentOffset += (targetOffset - currentOffset) * 0.1;
+      } else {
+        currentOffset = targetOffset;
+      }
+
+      const halfTotal = TOTAL_CARDS / 2;
+
+      cards.forEach(({ el, index }) => {
+        // Wrap card slot smoothly into [-halfTotal, +halfTotal)
+        let rel = (index - currentOffset) % TOTAL_CARDS;
+        if (rel < -halfTotal) rel += TOTAL_CARDS;
+        if (rel >= halfTotal) rel -= TOTAL_CARDS;
+
+        const theta = rel * ANGLE_STEP;
+        const x = RADIUS * Math.sin(theta);
+        const z = RADIUS * Math.cos(theta) - 90;
+        const y = -rel * VERTICAL_STEP;
+
+        // Cull cards far off-screen vertically
+        const maxVisibleY = window.innerHeight * 0.68;
+        if (Math.abs(y) > maxVisibleY) {
+          el.style.opacity = '0';
+          el.style.pointerEvents = 'none';
+          return;
+        }
+
+        const rotY = (theta * 180) / Math.PI;
+
+        // Depth & vertical edge fade
+        const depthNorm = (Math.cos(theta) + 1) * 0.5; // 0 at back of cylinder, 1 at front
+        const edgeFade = Math.max(0, 1 - Math.pow(Math.abs(y) / maxVisibleY, 2.6));
+        const opacity = edgeFade * (0.28 + 0.72 * depthNorm);
+
+        el.style.opacity = opacity.toFixed(3);
+        el.style.pointerEvents = opacity > 0.25 ? 'auto' : 'none';
+        el.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, ${z.toFixed(2)}px) rotateY(${rotY.toFixed(2)}deg) rotateZ(${HELIX_SLOPE_DEG}deg)`;
+        el.style.zIndex = Math.round(z + 1000);
+      });
+
+      requestAnimationFrame(renderSpiral);
+    }
+
+    // Pointer Drag Interaction
+    viewport.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      lastTime = performance.now();
+      velocity = 0;
+      viewport.setPointerCapture(e.pointerId);
+    });
+
+    viewport.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const now = performance.now();
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      const dt = Math.max(1, now - lastTime);
+
+      const dStep = (-dx * 0.0055) + (dy * 0.0055);
+      targetOffset += dStep;
+      velocity = dStep / dt;
+
+      lastX = e.clientX;
+      lastY = e.clientY;
+      lastTime = now;
+    });
+
+    function endDrag() {
+      if (!isDragging) return;
+      isDragging = false;
+      targetOffset += velocity * 170;
+    }
+
+    viewport.addEventListener('pointerup', endDrag);
+    viewport.addEventListener('pointercancel', endDrag);
+
+    // Wheel & Keyboard Support
+    window.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+      targetOffset += delta * 0.0032;
+    }, { passive: false });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') targetOffset -= 1;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') targetOffset += 1;
+    });
+
+    requestAnimationFrame(renderSpiral);
+  </script>
+</body>
+</html>

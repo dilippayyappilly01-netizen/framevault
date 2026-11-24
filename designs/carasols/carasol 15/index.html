@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vertical Perspective Cascade Carousel</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #000000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .viewport {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      perspective: 750px;
+      perspective-origin: 50% 50%;
+      cursor: ns-resize;
+      touch-action: none;
+      overflow: hidden;
+    }
+
+    .cascade-stage {
+      position: relative;
+      width: 0;
+      height: 0;
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+
+    /* Wide landscape cards tilted backward at top / forward at bottom so they form perspective trapezoids */
+    .cascade-card {
+      position: absolute;
+      width: 720px;
+      height: 210px;
+      margin-left: -360px;
+      margin-top: -105px;
+      overflow: hidden;
+      background: #141414;
+      box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.72), 0 12px 32px rgba(0, 0, 0, 0.65);
+      transform-style: preserve-3d;
+      will-change: transform, opacity;
+      /* Trapezoidal clip matching the recording's inverted-trapezoid louver geometry */
+      clip-path: polygon(0% 0%, 100% 0%, 91.5% 100%, 8.5% 100%);
+    }
+
+    .cascade-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      pointer-events: none;
+      image-rendering: high-quality;
+      image-rendering: -webkit-optimize-contrast;
+      transform: translateZ(0);
+    }
+
+    .ui-btn {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.14);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 40;
+    }
+
+    .ui-btn svg {
+      width: 15px;
+      height: 15px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  </style>
+</head>
+<body>
+
+  <button class="ui-btn" id="reverseBtn" title="Reverse Flow Direction">
+    <svg viewBox="0 0 24 24">
+      <polyline points="1 4 1 10 7 10"></polyline>
+      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+    </svg>
+  </button>
+
+  <div class="viewport" id="viewport">
+    <div class="cascade-stage" id="stage"></div>
+  </div>
+
+  <script>
+    const IMAGES = [
+      'images/1.jpg',
+      'images/2.jpg',
+      'images/3.jpg',
+      'images/4.jpg',
+      'images/5.jpg',
+      'images/6.jpg',
+      'images/7.jpg',
+      'images/8.jpg',
+      'images/9.jpg',
+      'images/10.jpg',
+      'images/11.jpg',
+      'images/12.jpg'
+    ];
+
+    const stage = document.getElementById('stage');
+    const viewport = document.getElementById('viewport');
+    const reverseBtn = document.getElementById('reverseBtn');
+
+    const TOTAL = IMAGES.length;
+    const cards = [];
+
+    IMAGES.forEach((src, i) => {
+      const el = document.createElement('div');
+      el.className = 'cascade-card';
+      el.innerHTML = `<img src="${src}" alt="Cascade ${i + 1}" loading="eager" decoding="sync" fetchpriority="high">`;
+      stage.appendChild(el);
+      cards.push({ el, index: i });
+    });
+
+    let progress = 0;
+    let targetProgress = 0;
+    let dir = 1;
+    let isDragging = false;
+    let lastY = 0;
+    let lastTime = 0;
+    let velocity = 0;
+
+    function renderCascade() {
+      if (!isDragging) {
+        targetProgress += 0.008 * dir;
+        progress += (targetProgress - progress) * 0.12;
+      } else {
+        progress = targetProgress;
+      }
+
+      const halfH = window.innerHeight * 0.56;
+      const visibleCount = 6.5; // 6-7 stacked trapezoidal slats visible from top to bottom
+
+      cards.forEach(({ el, index }) => {
+        // Normalized vertical slot u in [0, TOTAL)
+        let u = (index + progress) % TOTAL;
+        if (u < 0) u += TOTAL;
+
+        if (u > visibleCount) {
+          el.style.opacity = '0';
+          el.style.pointerEvents = 'none';
+          return;
+        }
+
+        const t = u / visibleCount; // 0 at top of stack, 1 at bottom of stack
+        // Non-linear perspective spacing: cards at bottom are larger and spaced further apart than cards at top
+        const y = -halfH * 0.92 + Math.pow(t, 1.28) * (halfH * 1.88);
+        const scale = 0.56 + Math.pow(t, 1.15) * 0.58;
+        const z = t * 140 - 70;
+
+        let opacity = 1;
+        if (t < 0.06) opacity = t / 0.06;
+        else if (t > 0.92) opacity = Math.max(0, 1 - (t - 0.92) / 0.08);
+
+        el.style.opacity = opacity.toFixed(3);
+        el.style.pointerEvents = 'auto';
+        el.style.transform = `translate3d(0, ${y.toFixed(2)}px, ${z.toFixed(2)}px) scale(${scale.toFixed(4)})`;
+        el.style.zIndex = Math.round(t * 100);
+      });
+
+      requestAnimationFrame(renderCascade);
+    }
+
+    viewport.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      lastY = e.clientY;
+      lastTime = performance.now();
+      velocity = 0;
+      viewport.setPointerCapture(e.pointerId);
+    });
+
+    viewport.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const now = performance.now();
+      const dy = e.clientY - lastY;
+      const dt = Math.max(1, now - lastTime);
+
+      const dStep = dy / 140;
+      targetProgress += dStep;
+      velocity = dStep / dt;
+
+      lastY = e.clientY;
+      lastTime = now;
+    });
+
+    function endDrag() {
+      if (!isDragging) return;
+      isDragging = false;
+      targetProgress += velocity * 140;
+    }
+
+    viewport.addEventListener('pointerup', endDrag);
+    viewport.addEventListener('pointercancel', endDrag);
+
+    window.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      targetProgress += e.deltaY * 0.0035;
+    }, { passive: false });
+
+    reverseBtn.addEventListener('click', () => {
+      dir *= -1;
+    });
+
+    requestAnimationFrame(renderCascade);
+  </script>
+</body>
+</html>

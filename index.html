@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FrameVault — The Web Component Library</title>
+  <meta name="description" content="FrameVault is a digital library of modern, customizable website components designed to eliminate repetitive UI work. Browse hundreds of pre-built headers, pricing tables, and interactive sections that drop straight into your workflow—so you can focus on building your product, not coding from scratch.">
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- TOP NAVIGATION BAR (21st.dev Glass Header) -->
+  <header class="ok-topbar">
+    <div class="ok-topbar-inner">
+      <div class="ok-topbar-left">
+        <a href="#top" class="ok-brand" id="brandHomeBtn" title="FrameVault Home">
+          <svg class="ok-brand-svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <rect x="2" y="2" width="5.5" height="5.5" rx="1.2"/>
+            <rect x="9.25" y="2" width="5.5" height="5.5" rx="1.2"/>
+            <rect x="9.25" y="9.25" width="5.5" height="5.5" rx="1.2" opacity="0.5"/>
+            <rect x="16.5" y="9.25" width="5.5" height="5.5" rx="1.2"/>
+            <rect x="2" y="16.5" width="5.5" height="5.5" rx="1.2"/>
+            <rect x="16.5" y="16.5" width="5.5" height="5.5" rx="1.2"/>
+          </svg>
+          <span class="ok-brand-title">FrameVault</span>
+          <span class="ok-brand-badge">50</span>
+        </a>
+
+        <nav class="ok-top-links" aria-label="Primary Navigation">
+          <button class="ok-top-link active" id="btnHomeTop">Library</button>
+          <button class="ok-top-link" data-quick-sec="orbs">Orbs</button>
+          <button class="ok-top-link" data-quick-sec="assets">Assets</button>
+          <button class="ok-top-link" data-quick-sec="carasols">Carasols</button>
+          <button class="ok-top-link" data-quick-sec="cubes">Cubes</button>
+          <button class="ok-top-link" id="btnNavMcp">MCP</button>
+          <button class="ok-top-link" id="btnNavPricing">Pricing</button>
+        </nav>
+      </div>
+
+      <div class="ok-topbar-actions">
+        <button class="ok-ghost-search" id="btnTopSearchFocus" type="button" title="Search components (/)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <span>Search</span>
+          <kbd class="ok-kbd">/</kbd>
+        </button>
+
+        <button class="ok-theme-btn" id="btnThemeToggle" type="button" title="Toggle Light / Dark theme" aria-label="Toggle color theme">
+          <svg class="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          <svg class="icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+        </button>
+
+        <button class="ok-btn-secondary ok-mcp-trigger" id="btnOpenMcpModal" type="button" title="Connect FrameVault MCP Server to Antigravity, Claude Code &amp; Cursor">
+          <span class="ok-mcp-dot" aria-hidden="true"></span>
+          <span>MCP</span>
+        </button>
+        <button class="ok-btn-secondary" id="btnOpenFeaturedStudio" type="button">Open Studio</button>
+        <button class="ok-cta-blue" id="btnHeaderPricingCta" type="button">Get Access · $4.99</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- AMBIENT HERO SHADER GRAPHIC (21st.dev Flowing Periwinkle Silk Canvas) -->
+  <div class="ok-hero-atmosphere" aria-hidden="true">
+    <canvas id="okHeroWaveCanvas"></canvas>
+  </div>
+
+  <!-- HERO HEADER -->
+  <section class="ok-hero-wrap" id="top">
+    <div class="ok-container">
+      <div class="ok-hero">
+        <div class="ok-hero-text">
+          <div class="ok-hero-eyebrow">Community UI &amp; WebGL 3D Component Registry</div>
+          <h1 class="ok-hero-title">The library</h1>
+          <p class="ok-hero-subtitle">
+            FrameVault is a digital library of modern, customizable website components designed to eliminate repetitive UI work. Browse hundreds of pre-built headers, pricing tables, and interactive sections that drop straight into your workflow&mdash;so you can focus on building your product, not coding from scratch.
+          </p>
+        </div>
+
+        <div class="ok-hero-stats">
+          <div class="ok-stat-pill"><span class="ok-stat-num">5</span><span class="ok-stat-label">Orbs</span></div>
+          <div class="ok-stat-pill"><span class="ok-stat-num">21</span><span class="ok-stat-label">Assets</span></div>
+          <div class="ok-stat-pill"><span class="ok-stat-num">22</span><span class="ok-stat-label">Carasols</span></div>
+          <div class="ok-stat-pill"><span class="ok-stat-num">2</span><span class="ok-stat-label">Cubes</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STICKY 21ST.DEV DUAL-ROW FILTER & SEARCH BAR -->
+  <div class="ok-catbar">
+    <div class="ok-container ok-catbar-inner">
+      <!-- Row 1: Primary Folder Segmented Tabs + Search Input -->
+      <div class="ok-catbar-row">
+        <nav class="ok-cattabs" id="navSections" aria-label="Component Sections"></nav>
+
+        <div class="ok-catbar-right">
+          <div class="ok-search-wrap">
+            <svg class="ok-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" id="searchInput" class="ok-search-input" placeholder="Search components...">
+            <kbd class="ok-search-kbd">/</kbd>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2: Engine Chips + View Mode & Grid Controls -->
+      <div class="ok-catbar-row ok-catbar-chips-row">
+        <div class="ok-catchips">
+          <button class="ok-chip active" data-engine-filter="ALL">
+            All <span class="ok-chip-count">50</span>
+          </button>
+          <button class="ok-chip" data-engine-filter="WEBGL 3D">
+            WebGL Shaders <span class="ok-chip-count">26</span>
+          </button>
+          <button class="ok-chip" data-engine-filter="DOM 3D">
+            DOM 3D <span class="ok-chip-count">18</span>
+          </button>
+          <button class="ok-chip" data-engine-filter="CANVAS 2D">
+            Canvas Physics <span class="ok-chip-count">6</span>
+          </button>
+          <button class="ok-chip" id="btnFilterModified">
+            Edited <span class="ok-chip-count" id="modifiedCountBadge">0</span>
+          </button>
+          <button class="ok-chip" id="btnResetAll" title="Reset all customized parameters to defaults">
+            Reset All
+          </button>
+        </div>
+
+        <div class="ok-view-controls">
+          <div class="ok-segmented" title="Grid Columns">
+            <button class="ok-seg-btn" data-grid-cols="2">2 col</button>
+            <button class="ok-seg-btn active" data-grid-cols="3">3 col</button>
+            <button class="ok-seg-btn" data-grid-cols="4">4 col</button>
+          </div>
+
+          <button class="ok-chip" id="btnToggleDirectory" type="button" title="Browse Component Index">
+            Index
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLIDE-OVER COMPONENT INDEX DRAWER -->
+  <div class="ok-dir-backdrop" id="directoryBackdrop">
+    <aside class="ok-dir-drawer" id="directoryDrawer" aria-label="Component Index">
+      <div class="ok-dir-header">
+        <span class="ok-dir-title">Component Index</span>
+        <button class="ok-icon-btn" id="btnCloseDirectory" type="button">Close</button>
+      </div>
+      <div class="ok-dir-scroll" id="sidebarSections"></div>
+    </aside>
+  </div>
+
+  <!-- MAIN COMPONENT GALLERY -->
+  <main class="ok-container ok-main">
+    <div id="mainSectionsContainer" class="ok-sections-stack"></div>
+
+    <!-- MCP SERVER + AGENT SKILL DELIVERY LAYER SECTION -->
+    <section class="ok-mcp-section" id="mcpSection" aria-label="MCP Server and Agent Skill">
+      <div class="ok-pricing-head">
+        <span class="ok-hero-eyebrow">AI Coding Integration</span>
+        <h2 class="ok-pricing-title">Connect via MCP Server &amp; Agent Skill</h2>
+        <p class="ok-pricing-sub">
+          Plug your existing <code>designs/</code> component library directly into <strong>Antigravity</strong>, <strong>Claude Code</strong>, and <strong>Cursor</strong> so agents search, fetch raw source, and adapt components automatically with Remix Prompts.
+        </p>
+      </div>
+
+      <div class="ok-mcp-grid">
+        <!-- Left Card: IDE Config Snippet -->
+        <div class="ok-mcp-card">
+          <div class="ok-mcp-card-top">
+            <div>
+              <span class="ok-pill-pro" id="mcpStatusPill">MCP Ready · Indexing...</span>
+              <h3 class="ok-mcp-card-title">1. Plug into your IDE</h3>
+            </div>
+            <div class="ok-segmented ok-mcp-ide-tabs" id="mcpSectionIdeTabs">
+              <button type="button" class="ok-seg-btn active" data-mcp-ide="antigravity">Antigravity</button>
+              <button type="button" class="ok-seg-btn" data-mcp-ide="claude">Claude Code</button>
+              <button type="button" class="ok-seg-btn" data-mcp-ide="cursor">Cursor</button>
+            </div>
+          </div>
+
+          <div class="ok-mcp-code-wrap">
+            <div class="ok-mcp-code-bar">
+              <span id="mcpSectionFileHint">mcp_config.json</span>
+              <button type="button" class="ok-btn-secondary ok-mcp-mini-btn" id="btnCopyMcpConfigSection">Copy JSON</button>
+            </div>
+            <pre class="ok-mcp-pre" id="mcpSectionConfigPre">Loading MCP configuration...</pre>
+          </div>
+        </div>
+
+        <!-- Right Card: Exposed Tools, Resource & SKILL.md -->
+        <div class="ok-mcp-card">
+          <div class="ok-mcp-card-top">
+            <div>
+              <span class="ok-pill-pro">SKILL.md Installed</span>
+              <h3 class="ok-mcp-card-title">2. Tools, Resource &amp; Agent Skill</h3>
+            </div>
+            <button type="button" class="ok-btn-secondary ok-mcp-mini-btn" id="btnCopySkillMdSection">Copy SKILL.md</button>
+          </div>
+
+          <div class="ok-mcp-cap-list">
+            <div class="ok-mcp-cap-item">
+              <code>search_components</code>
+              <span>Natural-language search across filenames, titles, engines, tags &amp; comments.</span>
+            </div>
+            <div class="ok-mcp-cap-item">
+              <code>get_component</code>
+              <span>Reads exact raw source from disk + returns a tailored Remix Prompt wrapper.</span>
+            </div>
+            <div class="ok-mcp-cap-item">
+              <code>ui://guidelines/design-system</code>
+              <span>Dynamic resource summarizing surface palettes, DPR/shader rules &amp; tokens.</span>
+            </div>
+            <div class="ok-mcp-cap-item">
+              <code>.agent/skills/originkit-ui/SKILL.md</code>
+              <span>Also mirrored at <code>.claude/skills/originkit-ui/SKILL.md</code> for automatic skill discovery.</span>
+            </div>
+          </div>
+
+          <div class="ok-mcp-prompt-box">
+            <label for="mcpPromptCompSelect">Generate an AI Remix Prompt for any component</label>
+            <div class="ok-mcp-prompt-row">
+              <select id="mcpPromptCompSelect" class="ok-co-input"></select>
+              <button type="button" class="ok-btn-secondary ok-mcp-mini-btn" id="btnPreviewAgentPrompt">Preview</button>
+              <button type="button" class="ok-cta-blue ok-mcp-mini-btn" id="btnCopyAgentPrompt">Copy Prompt</button>
+            </div>
+            <pre class="ok-mcp-prompt-preview" id="mcpPromptPreview" aria-label="Generated AI Remix Prompt preview"></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 21ST.DEV PRICING SECTION ($4.99 ALL-ACCESS DOWNLOAD PASS) -->
+    <section class="ok-pricing-section" id="pricingSection" aria-label="Pricing">
+      <div class="ok-pricing-head">
+        <span class="ok-hero-eyebrow">Simple pricing</span>
+        <h2 class="ok-pricing-title"><span data-price-text>$4.99</span> for full HTML &amp; React TypeScript access</h2>
+        <p class="ok-pricing-sub">
+          Explore and customize all 50 live 3D shaders, cubes, orbs &amp; carousels freely. Pay <span data-price-text>$4.99</span> once to unlock Copy &amp; Studio source code plus unlimited standalone <code>.html</code> and TypeScript React <code>.tsx</code> downloads across the entire library.
+        </p>
+      </div>
+
+      <div class="ok-pricing-grid">
+        <!-- Free Browse Tier -->
+        <div class="ok-price-card">
+          <div class="ok-price-top">
+            <span class="ok-price-name">Interactive Browse</span>
+            <div class="ok-price-amount-row">
+              <span class="ok-price-num">$0</span>
+              <span class="ok-price-period">forever</span>
+            </div>
+            <p class="ok-price-desc">Inspect and customize all 50 live interactive components in the browser.</p>
+          </div>
+          <ul class="ok-price-list">
+            <li><span class="ok-check">&#10003;</span><span>Explore &amp; interact with all 50 live 3D components</span></li>
+            <li><span class="ok-check">&#10003;</span><span>Full Parametric Studio controls (Speeds, Effects, Colours, DOM Props)</span></li>
+            <li><span class="ok-check ok-check-muted">&times;</span><span>Download standalone <code>.html</code> files (locked)</span></li>
+            <li><span class="ok-check ok-check-muted">&times;</span><span>Copy HTML &amp; Studio Source Inspector (locked)</span></li>
+          </ul>
+          <button class="ok-btn-secondary ok-price-btn" id="btnFreeBrowseScroll" type="button">Browse all 50 components</button>
+        </div>
+
+        <!-- Paid All-Access Tier ($4.99) -->
+        <div class="ok-price-card ok-price-card-featured" id="proPriceCard">
+          <div class="ok-price-badge-row">
+            <span class="ok-price-name">All-Access HTML Pass</span>
+            <span class="ok-pill-pro" id="pricingStatusPill">50 Components</span>
+          </div>
+          <div class="ok-price-top">
+            <div class="ok-price-amount-row">
+              <span class="ok-price-num" data-price-text>$4.99</span>
+              <span class="ok-price-period">one-time payment</span>
+            </div>
+            <p class="ok-price-desc">Lifetime HTML download &amp; source export across all 50 components.</p>
+          </div>
+          <ul class="ok-price-list">
+            <li><span class="ok-check">&#10003;</span><span>Download unlimited <code>.html</code>, React <code>.tsx</code> &amp; editable Figma <code>.svg</code> files</span></li>
+            <li><span class="ok-check">&#10003;</span><span>Customized speeds, colours, shaders &amp; DOM props baked in</span></li>
+            <li><span class="ok-check">&#10003;</span><span>Copy directly into Figma (<code>Ctrl+V</code>) + Figma Design Tokens JSON</span></li>
+            <li><span class="ok-check">&#10003;</span><span>Commercial license for personal &amp; client sites</span></li>
+          </ul>
+          <button class="ok-cta-blue ok-price-btn" id="btnUnlockLibraryCard" type="button">Unlock All Access — $4.99</button>
+          <div class="ok-license-meta" id="pricingRestoreWrap" style="justify-content:center;">
+            <button type="button" class="ok-link-muted" id="btnOpenRestoreFromPricing">Already purchased? Restore license</button>
+          </div>
+          <div class="ok-license-meta" id="pricingLicenseMeta" style="display:none;">
+            <span id="pricingLicenseKeyText"></span>
+            <button type="button" class="ok-link-muted" id="btnRelockDemo">Lock access</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- SPLIT-SCREEN PARAMETRIC COMPONENT STUDIO MODAL -->
+  <div class="ok-studio-backdrop" id="studioBackdrop" role="dialog" aria-modal="true">
+    <div class="ok-studio-window">
+      <!-- Studio Top Header -->
+      <div class="ok-studio-header">
+        <div class="ok-studio-nav">
+          <button class="ok-icon-btn" id="studioHomeBtn" title="Close Studio &amp; Go Home">Library</button>
+          <button class="ok-icon-btn" id="studioPrevBtn" title="Previous Component">&lsaquo; Prev</button>
+          <div class="ok-studio-comp-title" id="studioCompTitle"></div>
+          <button class="ok-icon-btn" id="studioNextBtn" title="Next Component">Next &rsaquo;</button>
+        </div>
+
+        <div class="ok-studio-toolbar">
+          <div class="ok-segmented">
+            <button class="ok-seg-btn active" data-stage-mode="live">Live</button>
+            <button class="ok-seg-btn" data-stage-mode="split">Split</button>
+            <button class="ok-seg-btn" data-stage-mode="code">Code</button>
+          </div>
+
+          <div class="ok-segmented">
+            <button class="ok-seg-btn active" data-vp-size="full">100%</button>
+            <button class="ok-seg-btn" data-vp-size="desktop">Desktop</button>
+            <button class="ok-seg-btn" data-vp-size="square">1:1</button>
+            <button class="ok-seg-btn" data-vp-size="mobile">Mobile</button>
+          </div>
+
+          <div class="ok-segmented" title="Output Code Format">
+            <button class="ok-seg-btn active" data-code-format="html">HTML</button>
+            <button class="ok-seg-btn" data-code-format="tsx">React TSX</button>
+          </div>
+
+          <button class="ok-btn-secondary" id="studioResetBtn">Reset</button>
+          <button class="ok-btn-secondary" id="studioFigmaBtn" title="Copy or export editable Figma layers &amp; design tokens">Figma</button>
+          <button class="ok-btn-secondary" id="studioMcpPromptBtn" title="Open AI Remix Prompt builder (originkit-ui MCP)">AI Prompt</button>
+          <button class="ok-btn-secondary" id="studioCopyBtn">Copy HTML</button>
+          <button class="ok-cta-blue" id="studioDownloadBtn">Download .html</button>
+          <button class="ok-icon-btn ok-close-btn" id="studioCloseBtn">Esc</button>
+        </div>
+      </div>
+
+      <!-- Studio Body -->
+      <div class="ok-studio-body">
+        <!-- Left Pane: Live Component Stage & Live HTML/React TSX Code Inspector -->
+        <div class="ok-studio-stage-pane mode-live" id="studioStagePane">
+          <div class="ok-studio-stage-wrap">
+            <div class="ok-studio-viewport-frame" id="studioViewportFrame">
+              <iframe class="ok-studio-iframe" id="studioIframe" sandbox="allow-scripts allow-same-origin"></iframe>
+            </div>
+          </div>
+          <div class="ok-studio-code-pane" style="position:relative;">
+            <div class="ok-code-header">
+              <span id="studioCodeHeaderTitle">Generated Standalone HTML Output</span>
+              <div class="ok-segmented" id="studioCodeFormatTabs">
+                <button class="ok-seg-btn active" data-code-format="html">HTML</button>
+                <button class="ok-seg-btn" data-code-format="tsx">React TSX</button>
+              </div>
+            </div>
+            <pre class="ok-code-pre" id="studioCodePre"></pre>
+            <div class="ok-code-lock-overlay" id="studioCodeLockOverlay">
+              <div class="ok-lock-card">
+                <span class="ok-pill-pro">All-Access · <span data-price-text>$4.99</span></span>
+                <h3>HTML &amp; React TSX source &amp; downloads are locked</h3>
+                <p>One-time <span data-price-text>$4.99</span> payment unlocks full HTML &amp; TypeScript React (.tsx) source view, copy, and downloads for all 50 components.</p>
+                <button type="button" class="ok-cta-blue" id="btnStudioUnlockOverlay">Unlock All Access — $4.99</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Pane: Non-AI Control Parameter Set -->
+        <div class="ok-studio-controls-pane">
+          <div class="ok-ctrl-tabs" id="studioCtrlTabs">
+            <button class="ok-ctrl-tab active" data-studio-tab="speeds">Speeds</button>
+            <button class="ok-ctrl-tab" data-studio-tab="effects">Effects</button>
+            <button class="ok-ctrl-tab" data-studio-tab="colours">Colours</button>
+            <button class="ok-ctrl-tab" data-studio-tab="html">HTML Props</button>
+            <button class="ok-ctrl-tab" data-studio-tab="images" id="tabImagesBtn" style="display:none;">Images</button>
+          </div>
+
+          <div class="ok-ctrl-filter-bar">
+            <input type="text" class="ok-ctrl-filter-input" id="ctrlFilterInput" placeholder="Filter control parameters...">
+          </div>
+
+          <div class="ok-ctrl-scroll" id="studioControlsScroll"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- $4.99 ALL-ACCESS CHECKOUT MODAL -->
+  <div class="ok-checkout-backdrop" id="checkoutBackdrop" role="dialog" aria-modal="true" aria-labelledby="checkoutModalTitle">
+    <div class="ok-checkout-modal">
+      <div class="ok-checkout-header">
+        <div>
+          <span class="ok-pill-pro">All-Access Pass</span>
+          <h3 class="ok-checkout-title" id="checkoutModalTitle">Unlock FrameVault Library</h3>
+        </div>
+        <button type="button" class="ok-icon-btn" id="btnCloseCheckout">Close</button>
+      </div>
+
+      <div class="ok-checkout-summary">
+        <div class="ok-summary-info">
+          <strong>Entire Component Library (50 components)</strong>
+          <span>Unlimited standalone <code>.html</code> downloads &amp; copy HTML</span>
+        </div>
+        <div class="ok-summary-price" data-price-text>$4.99</div>
+      </div>
+
+      <div class="ok-segmented" style="width:100%; display:grid; grid-template-columns:1fr 1fr;" role="tablist">
+        <button type="button" class="ok-seg-btn active" id="tabCheckoutBuy" data-co-tab="buy">Buy Pass · <span data-price-text>$4.99</span></button>
+        <button type="button" class="ok-seg-btn" id="tabCheckoutRestore" data-co-tab="restore">Restore License</button>
+      </div>
+
+      <form id="checkoutForm" class="ok-checkout-form" novalidate>
+        <div class="ok-form-group">
+          <label for="coEmail">Email for license receipt</label>
+          <input type="email" id="coEmail" class="ok-co-input" placeholder="you@studio.dev" required>
+        </div>
+
+        <div id="coDemoCardFields" style="display:flex; flex-direction:column; gap:12px;">
+          <div class="ok-form-group">
+            <div class="ok-co-label-row">
+              <label for="coName">Cardholder name</label>
+              <button type="button" class="ok-fill-demo-btn" id="btnFillTestCard">Fill test card</button>
+            </div>
+            <input type="text" id="coName" class="ok-co-input" placeholder="Alex Morgan" required>
+          </div>
+
+          <div class="ok-form-group">
+            <label for="coCard">Card number</label>
+            <input type="text" id="coCard" class="ok-co-input" placeholder="4242 4242 4242 4242" maxlength="23" inputmode="numeric" required>
+          </div>
+
+          <div class="ok-co-split">
+            <div class="ok-form-group">
+              <label for="coExpiry">Expiry</label>
+              <input type="text" id="coExpiry" class="ok-co-input" placeholder="12 / 28" maxlength="7" required>
+            </div>
+            <div class="ok-form-group">
+              <label for="coCvc">CVC</label>
+              <input type="text" id="coCvc" class="ok-co-input" placeholder="424" maxlength="4" inputmode="numeric" required>
+            </div>
+          </div>
+        </div>
+
+        <div class="ok-checkout-error" id="checkoutError" style="display:none;"></div>
+
+        <button type="submit" class="ok-cta-blue ok-checkout-submit" id="btnCheckoutSubmit">
+          Pay $4.99 &amp; Unlock HTML Downloads
+        </button>
+
+        <p class="ok-checkout-foot" id="checkoutFootNote">
+          Server-verified access · Downloads are enforced by <code>/api/export-html</code> (<span data-price-text>$4.99</span> one-time pass).
+        </p>
+      </form>
+
+      <form id="restoreForm" class="ok-checkout-form" style="display:none;" novalidate>
+        <div class="ok-form-group">
+          <label for="restoreLicenseKey">License Key</label>
+          <input type="text" id="restoreLicenseKey" class="ok-co-input" placeholder="OK-PRO-XXXX-XXXX-XXXX-XXXX" required>
+        </div>
+
+        <div class="ok-form-group">
+          <label for="restoreEmail">Purchase Email (optional verification)</label>
+          <input type="email" id="restoreEmail" class="ok-co-input" placeholder="you@studio.dev">
+        </div>
+
+        <div class="ok-checkout-error" id="restoreError" style="display:none;"></div>
+
+        <button type="submit" class="ok-cta-blue ok-checkout-submit" id="btnRestoreSubmit">
+          Restore All-Access License
+        </button>
+
+        <button type="button" class="ok-btn-secondary" id="btnResendLicenseEmail" style="display:none; width:100%; height:36px;">
+          Resend License Key to Email
+        </button>
+
+        <p class="ok-checkout-foot">
+          Enter the license key from your purchase receipt to unlock this browser.
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <!-- MCP SERVER + SKILL QUICK-SETUP MODAL -->
+  <div class="ok-checkout-backdrop" id="mcpBackdrop" role="dialog" aria-modal="true" aria-labelledby="mcpModalTitle">
+    <div class="ok-checkout-modal ok-mcp-modal">
+      <div class="ok-checkout-header">
+        <div>
+          <span class="ok-pill-pro" id="mcpModalStatusPill">MCP Server · Live</span>
+          <h3 class="ok-checkout-title" id="mcpModalTitle">Connect FrameVault MCP</h3>
+        </div>
+        <button type="button" class="ok-icon-btn" id="btnCloseMcpModal">Close</button>
+      </div>
+
+      <p class="ok-mcp-modal-desc">
+        Expose all auto-indexed components from <code>designs/</code> to Antigravity, Claude Code, or Cursor via <code>search_components</code>, <code>get_component</code>, and <code>ui://guidelines/design-system</code>.
+      </p>
+
+      <div class="ok-mcp-modal-bar">
+        <div class="ok-segmented ok-mcp-ide-tabs" id="mcpModalIdeTabs">
+          <button type="button" class="ok-seg-btn active" data-mcp-ide="antigravity">Antigravity</button>
+          <button type="button" class="ok-seg-btn" data-mcp-ide="claude">Claude Code</button>
+          <button type="button" class="ok-seg-btn" data-mcp-ide="cursor">Cursor</button>
+        </div>
+        <span class="ok-mcp-file-chip" id="mcpModalFileHint">mcp_config.json</span>
+      </div>
+
+      <pre class="ok-mcp-pre ok-mcp-pre-modal" id="mcpModalConfigPre">Loading MCP configuration...</pre>
+
+      <div class="ok-mcp-modal-actions">
+        <button type="button" class="ok-cta-blue" id="btnCopyMcpConfigModal">Copy MCP JSON Config</button>
+        <button type="button" class="ok-btn-secondary" id="btnCopySkillMdModal">Copy SKILL.md</button>
+        <button type="button" class="ok-btn-secondary" id="btnJumpMcpSection">Full MCP Panel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI REMIX PROMPT MODAL -->
+  <div class="ok-checkout-backdrop" id="aiPromptBackdrop" role="dialog" aria-modal="true" aria-labelledby="aiPromptModalTitle">
+    <div class="ok-checkout-modal ok-ai-prompt-modal">
+      <div class="ok-checkout-header">
+        <div>
+          <span class="ok-pill-pro" id="aiPromptCompBadge">originkit-ui MCP</span>
+          <h3 class="ok-checkout-title" id="aiPromptModalTitle">AI Remix Prompt</h3>
+        </div>
+        <button type="button" class="ok-icon-btn" id="btnCloseAiPromptModal">Close</button>
+      </div>
+
+      <p class="ok-mcp-modal-desc" id="aiPromptCompDesc">
+        Paste this prompt into <strong>Antigravity</strong>, <strong>Claude Code</strong>, or <strong>Cursor</strong> with the <code>originkit-ui</code> MCP server connected.
+      </p>
+
+      <div class="ok-ai-prompt-controls">
+        <div class="ok-form-group">
+          <label for="aiPromptFramework">Target framework</label>
+          <select id="aiPromptFramework" class="ok-co-input">
+            <option value="">Auto-detect from my project</option>
+            <option value="React + Tailwind">React + Tailwind</option>
+            <option value="Next.js App Router">Next.js App Router</option>
+            <option value="Vue 3">Vue 3</option>
+            <option value="Svelte">Svelte</option>
+            <option value="Standalone HTML">Standalone HTML</option>
+          </select>
+        </div>
+
+        <label class="ok-ai-prompt-check" id="aiPromptIncludeEditsWrap">
+          <input type="checkbox" id="aiPromptIncludeEdits" checked>
+          <span id="aiPromptIncludeEditsLabel">Include current Studio customizations</span>
+        </label>
+      </div>
+
+      <div class="ok-form-group">
+        <label for="aiPromptTextarea">Prompt (editable)</label>
+        <textarea id="aiPromptTextarea" class="ok-ai-prompt-textarea" rows="7" spellcheck="false"></textarea>
+      </div>
+
+      <div class="ok-mcp-modal-actions">
+        <button type="button" class="ok-cta-blue" id="btnCopyAiPromptModal">Copy Prompt</button>
+        <button type="button" class="ok-btn-secondary" id="btnSelectAiPromptModal">Select All</button>
+        <button type="button" class="ok-btn-secondary" id="btnOpenMcpFromPrompt">MCP Setup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EDIT IN FIGMA MODAL -->
+  <div class="ok-checkout-backdrop" id="figmaBackdrop" role="dialog" aria-modal="true" aria-labelledby="figmaModalTitle">
+    <div class="ok-checkout-modal ok-figma-modal">
+      <div class="ok-checkout-header">
+        <div>
+          <span class="ok-pill-pro" id="figmaCompBadge">Editable Figma Export</span>
+          <h3 class="ok-checkout-title" id="figmaModalTitle">Edit in Figma</h3>
+        </div>
+        <button type="button" class="ok-icon-btn" id="btnCloseFigmaModal">Close</button>
+      </div>
+
+      <p class="ok-mcp-modal-desc">
+        Exports named, editable Figma vector layers, gradients, text nodes &amp; design tokens matching your current Studio customizations. Copy and press <code>Ctrl+V</code> directly on any Figma canvas.
+      </p>
+
+      <div class="ok-figma-controls">
+        <div class="ok-form-group" style="flex:1; min-width:180px;">
+          <label for="figmaFramePreset">Figma frame size</label>
+          <select id="figmaFramePreset" class="ok-co-input">
+            <option value="desktop">Desktop (1440 × 900)</option>
+            <option value="card">Card (1200 × 800)</option>
+            <option value="square">Square (1080 × 1080)</option>
+            <option value="mobile">Mobile (390 × 844)</option>
+          </select>
+        </div>
+
+        <label class="ok-ai-prompt-check" style="margin-top:20px;">
+          <input type="checkbox" id="figmaIncludeSwatches" checked>
+          <span>Include color swatch tokens</span>
+        </label>
+      </div>
+
+      <div class="ok-figma-preview-stage" id="figmaPreviewStage" aria-label="Editable Figma vector preview">
+        <span style="color:var(--text-muted);font-size:12.5px;">Generating editable Figma layers...</span>
+      </div>
+
+      <div class="ok-mcp-modal-actions">
+        <button type="button" class="ok-cta-blue" id="btnCopyFigmaSvg">Copy for Figma (Ctrl+V)</button>
+        <button type="button" class="ok-btn-secondary" id="btnDownloadFigmaSvg">Download .svg</button>
+        <button type="button" class="ok-btn-secondary" id="btnDownloadFigmaTokens">Tokens .json</button>
+        <a href="https://figma.new" target="_blank" rel="noopener noreferrer" class="ok-btn-secondary ok-figma-link-btn" id="btnOpenFigmaNew">Open figma.new ↗</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="ok-toast" id="toastNotification"></div>
+
+  <script src="components-data.js" defer></script>
+  <script src="app.js" defer></script>
+</body>
+</html>

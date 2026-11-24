@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carousel 21 — Interactive Vertical Strip Wave Magnification</title>
+<style>
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000000;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #stage {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: #000000;
+  }
+
+  #stripTrack {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    height: 76vh;
+    will-change: transform;
+  }
+
+  .strip {
+    position: relative;
+    overflow: hidden;
+    background: #111;
+    cursor: pointer;
+    flex-shrink: 0;
+    will-change: width, height, transform;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75);
+  }
+
+  .strip img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    pointer-events: none;
+    image-rendering: high-quality;
+    -webkit-user-drag: none;
+    will-change: transform, object-position;
+    transform: scale(1.06);
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="stripTrack"></div>
+</div>
+
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const track = document.getElementById('stripTrack');
+
+  // All 12 high-resolution user photos from images/1.jpg..12.jpg
+  const IMAGES = Array.from({ length: 12 }, (_, i) => `images/${i + 1}.jpg`);
+
+  const strips = [];
+
+  IMAGES.forEach((src, i) => {
+    const strip = document.createElement('div');
+    strip.className = 'strip';
+
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = `Visual ${i + 1}`;
+    img.loading = 'eager';
+    img.decoding = 'sync';
+    img.fetchPriority = 'high';
+
+    strip.appendChild(img);
+    track.appendChild(strip);
+
+    strips.push({
+      el: strip,
+      img,
+      index: i,
+      curW: 164,
+      curH: 480,
+      targetW: 164,
+      targetH: 480,
+      curObjX: 50,
+      targetObjX: 50
+    });
+  });
+
+  let pointerX = -9999;
+  let pointerY = -9999;
+  let isHovering = false;
+  let scrollOffset = 0;
+  let targetScrollOffset = 0;
+  let isDragging = false;
+  let dragStartX = 0;
+  let dragStartOffset = 0;
+
+  window.addEventListener('pointermove', (e) => {
+    pointerX = e.clientX;
+    pointerY = e.clientY;
+    const vh = window.innerHeight;
+    // Activate wave magnification when cursor is over the strip band
+    isHovering = pointerY > vh * 0.12 && pointerY < vh * 0.88;
+
+    if (isDragging) {
+      const dx = e.clientX - dragStartX;
+      targetScrollOffset = dragStartOffset + dx;
+    }
+  });
+
+  window.addEventListener('pointerleave', () => {
+    isHovering = false;
+    pointerX = -9999;
+  });
+
+  window.addEventListener('pointerdown', (e) => {
+    isDragging = true;
+    dragStartX = e.clientX;
+    dragStartOffset = targetScrollOffset;
+  });
+
+  window.addEventListener('pointerup', () => {
+    isDragging = false;
+  });
+
+  window.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    targetScrollOffset -= delta * 0.85;
+  }, { passive: false });
+
+  // Clicking a strip smoothly centers it in the viewport
+  strips.forEach((s, idx) => {
+    s.el.addEventListener('click', () => {
+      const mid = (strips.length - 1) * 0.5;
+      targetScrollOffset = (mid - idx) * 182;
+    });
+  });
+
+  function animate() {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    // Responsive base dimensions matching the recording's 7-visible vertical strips
+    const baseW = Math.max(125, Math.min(182, vw * 0.115));
+    const maxW = baseW * 1.62;
+    const baseH = Math.round(vh * 0.57);
+    const maxH = Math.round(vh * 0.72);
+
+    // Clamp horizontal track scroll so all 12 high-res photos can be explored
+    const maxScroll = Math.max(0, (strips.length * (baseW + 18) - vw * 0.78) * 0.55);
+    targetScrollOffset = Math.max(-maxScroll, Math.min(maxScroll, targetScrollOffset));
+    scrollOffset += (targetScrollOffset - scrollOffset) * 0.1;
+
+    track.style.transform = `translate3d(${scrollOffset.toFixed(1)}px, 0, 0)`;
+
+    // Measure strip centers to compute smooth Gaussian wave magnification
+    const sigma = baseW * 1.65;
+
+    for (let i = 0; i < strips.length; i++) {
+      const s = strips[i];
+      const rect = s.el.getBoundingClientRect();
+      const centerX = rect.left + rect.width * 0.5;
+
+      let influence = 0;
+      if (isHovering && pointerX >= 0) {
+        const dist = pointerX - centerX;
+        influence = Math.exp(-(dist * dist) / (2 * sigma * sigma));
+        // Subtle inner horizontal parallax as cursor moves across a strip
+        const normDist = Math.max(-1, Math.min(1, dist / (baseW * 2.5)));
+        s.targetObjX = 50 - normDist * 18;
+      } else {
+        s.targetObjX = 50;
+      }
+
+      s.targetW = baseW + (maxW - baseW) * influence;
+      s.targetH = baseH + (maxH - baseH) * influence;
+
+      s.curW += (s.targetW - s.curW) * 0.12;
+      s.curH += (s.targetH - s.curH) * 0.12;
+      s.curObjX += (s.targetObjX - s.curObjX) * 0.12;
+
+      s.el.style.width = `${s.curW.toFixed(1)}px`;
+      s.el.style.height = `${s.curH.toFixed(1)}px`;
+      s.img.style.objectPosition = `${s.curObjX.toFixed(1)}% 50%`;
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

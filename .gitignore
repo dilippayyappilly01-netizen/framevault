@@ -1,0 +1,22 @@
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+
+# Runtime license databases
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.ok-licenses.json
+
+# Dependencies & logs
+node_modules/
+npm-debug.log*
+
+# Local IDE MCP configs (contain machine-specific paths)
+.mcp.json
+.cursor/
+
+# Local screen recordings (not served by the web app)
+*.mp4

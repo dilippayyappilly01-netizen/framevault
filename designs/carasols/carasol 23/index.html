@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carousel 23 — 3D Geodesic Core &amp; Radial Tethered Photo Constellation</title>
+<style>
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000000;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #stage {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: #000000;
+    cursor: grab;
+  }
+
+  #stage:active {
+    cursor: grabbing;
+  }
+
+  /* Canvas draws the central geodesic wireframe sphere, glowing white core, and 3D radial tether lines */
+  #wireCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+    z-index: 200;
+  }
+
+  #cardsLayer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .node-card {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 142px;
+    height: 102px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #111;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.85);
+    will-change: transform, opacity, filter;
+    pointer-events: auto;
+    cursor: pointer;
+    transition: box-shadow 0.25s ease;
+    backface-visibility: hidden;
+  }
+
+  .node-card:hover,
+  .node-card.selected {
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.95), 0 0 0 1.5px rgba(255, 255, 255, 0.45);
+  }
+
+  .node-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    pointer-events: none;
+    image-rendering: high-quality;
+    -webkit-user-drag: none;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="wireCanvas"></canvas>
+  <div id="cardsLayer"></div>
+</div>
+
+<script>
+(() => {
+  const wireCanvas = document.getElementById('wireCanvas');
+  const ctx = wireCanvas.getContext('2d');
+  const cardsLayer = document.getElementById('cardsLayer');
+
+  const IMAGES = Array.from({ length: 12 }, (_, i) => `images/${i + 1}.jpg`);
+
+  let width = 0;
+  let height = 0;
+  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    width = window.innerWidth;
+    height = window.innerHeight;
+    wireCanvas.width = Math.round(width * dpr);
+    wireCanvas.height = Math.round(height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+
+  // 1. Build Geodesic / Fibonacci triangulated wireframe lattice for the central core sphere
+  const CORE_VERTS = 160;
+  const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+  const coreVerts = [];
+  const coreEdges = [];
+
+  for (let i = 0; i < CORE_VERTS; i++) {
+    const y = 1 - (i / (CORE_VERTS - 1)) * 2;
+    const r = Math.sqrt(Math.max(0, 1 - y * y));
+    const theta = GOLDEN_ANGLE * i;
+    coreVerts.push({
+      x: Math.cos(theta) * r,
+      y,
+      z: Math.sin(theta) * r
+    });
+  }
+
+  // Connect nearby vertices on the unit sphere to form the intricate white geodesic mesh
+  for (let i = 0; i < CORE_VERTS; i++) {
+    for (let j = i + 1; j < CORE_VERTS; j++) {
+      const dx = coreVerts[i].x - coreVerts[j].x;
+      const dy = coreVerts[i].y - coreVerts[j].y;
+      const dz = coreVerts[i].z - coreVerts[j].z;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (dist < 0.34) {
+        coreEdges.push([i, j]);
+      }
+    }
+  }
+
+  // 2. Build 26 radially tethered 3D photo cards around the central geodesic sphere
+  const NUM_NODES = 26;
+  const nodes = [];
+
+  for (let i = 0; i < NUM_NODES; i++) {
+    const el = document.createElement('div');
+    el.className = 'node-card';
+
+    const img = document.createElement('img');
+    img.src = IMAGES[i % IMAGES.length];
+    img.alt = `Work ${(i % IMAGES.length) + 1}`;
+    img.loading = 'eager';
+    img.decoding = 'sync';
+    img.fetchPriority = 'high';
+
+    el.appendChild(img);
+    cardsLayer.appendChild(el);
+
+    // Distribute cards around an equatorial-fanned shell leaving a clear central window around the geodesic sphere
+    const y = (1 - ((i + 0.5) / NUM_NODES) * 2) * 0.78;
+    const r = Math.sqrt(Math.max(0.18, 1 - y * y));
+    const theta = GOLDEN_ANGLE * i * 1.03;
+    const dirX = Math.cos(theta) * r;
+    const dirY = y;
+    const dirZ = Math.sin(theta) * r * 0.72;
+
+    // Varying tether lengths (2.45x to 3.45x core radius) so tether lines & center sphere stay clearly visible
+    const radialDist = 2.48 + (i % 4) * 0.32;
+
+    const node = {
+      el,
+      index: i,
+      dirX,
+      dirY,
+      dirZ,
+      radialDist,
+      hoverScale: 1,
+      targetHoverScale: 1,
+      sx: 0,
+      sy: 0,
+      sz: 0,
+      anchorX: 0,
+      anchorY: 0
+    };
+
+    el.addEventListener('pointerenter', () => {
+      node.targetHoverScale = 1.16;
+    });
+    el.addEventListener('pointerleave', () => {
+      node.targetHoverScale = 1.0;
+    });
+
+    // Clicking a card pulls it into the center foreground spotlight (just like in the video at 0:02-0:10)
+    el.addEventListener('click', (e) => {
+      if (dragDistance > 6) return;
+      e.stopPropagation();
+      if (selectedNode === node) {
+        selectedNode = null;
+        node.el.classList.remove('selected');
+      } else {
+        if (selectedNode) selectedNode.el.classList.remove('selected');
+        selectedNode = node;
+        node.el.classList.add('selected');
+      }
+    });
+
+    nodes.push(node);
+  }
+
+  let selectedNode = null;
+  window.addEventListener('click', () => {
+    if (dragDistance <= 6 && selectedNode) {
+      selectedNode.el.classList.remove('selected');
+      selectedNode = null;
+    }
+  });
+
+  // 3D rotation state
+  let rotX = 0.14;
+  let rotY = 0.35;
+  let velX = 0.0;
+  let velY = 0.0028;
+  let isDragging = false;
+  let lastX = 0;
+  let lastY = 0;
+  let dragDistance = 0;
+
+  window.addEventListener('pointerdown', (e) => {
+    isDragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    dragDistance = 0;
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    dragDistance += Math.hypot(dx, dy);
+
+    velY = dx * 0.0055;
+    velX = dy * 0.0055;
+    rotY += velY;
+    rotX = Math.max(-1.35, Math.min(1.35, rotX + velX));
+  });
+
+  window.addEventListener('pointerup', () => {
+    isDragging = false;
+  });
+
+  window.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    rotY += e.deltaY * 0.0012;
+  }, { passive: false });
+
+  function rotate3D(x, y, z, sinX, cosX, sinY, cosY) {
+    const x1 = x * cosY - z * sinY;
+    const z1 = x * sinY + z * cosY;
+    const y2 = y * cosX - z1 * sinX;
+    const z2 = y * sinX + z1 * cosX;
+    return { x: x1, y: y2, z: z2 };
+  }
+
+  function animate() {
+    if (!isDragging) {
+      rotY += velY;
+      velY += (0.0024 - velY) * 0.03;
+      velX *= 0.94;
+      rotX += velX;
+    }
+
+    ctx.clearRect(0, 0, width, height);
+
+    const cx = width * 0.5;
+    const cy = height * 0.5;
+    const coreRadius = Math.min(width, height) * 0.128;
+    const fov = 900;
+
+    const sinY = Math.sin(rotY);
+    const cosY = Math.cos(rotY);
+    const sinX = Math.sin(rotX);
+    const cosX = Math.cos(rotX);
+
+    // Project core vertices
+    const projVerts = coreVerts.map(v => {
+      const r = rotate3D(v.x, v.y, v.z, sinX, cosX, sinY, cosY);
+      const scale = fov / (fov - r.z * coreRadius);
+      return {
+        sx: cx + r.x * coreRadius * scale,
+        sy: cy + r.y * coreRadius * scale,
+        z: r.z
+      };
+    });
+
+    // Update and project photo nodes + draw radial tether spokes
+    ctx.lineWidth = 1.05;
+    for (let i = 0; i < NUM_NODES; i++) {
+      const n = nodes[i];
+      n.hoverScale += (n.targetHoverScale - n.hoverScale) * 0.14;
+
+      const r = rotate3D(n.dirX, n.dirY, n.dirZ, sinX, cosX, sinY, cosY);
+
+      // Anchor point on the surface of the geodesic core sphere
+      const anchorScale = fov / (fov - r.z * coreRadius);
+      const ax = cx + r.x * coreRadius * anchorScale;
+      const ay = cy + r.y * coreRadius * anchorScale;
+
+      // Outer card center in 3D space
+      const worldX = r.x * coreRadius * n.radialDist;
+      const worldY = r.y * coreRadius * n.radialDist;
+      const worldZ = r.z * coreRadius * n.radialDist;
+
+      const persp = fov / (fov - worldZ);
+      let sx = cx + worldX * persp;
+      let sy = cy + worldY * persp;
+      // Keep cards outside the central geodesic sphere halo so the center sphere stays clearly visible
+      const minClearR = coreRadius * 1.62;
+      const dCenter = Math.hypot(sx - cx, sy - cy);
+      if (selectedNode !== n && dCenter < minClearR) {
+        const pushScale = minClearR / Math.max(8, dCenter);
+        sx = cx + (sx - cx) * pushScale;
+        sy = cy + (sy - cy) * pushScale;
+      }
+      let cardScale = persp * (0.78 + 0.28 * ((r.z + 1) * 0.5)) * n.hoverScale;
+      let zIdx = Math.round(200 + r.z * 160);
+
+      // If this card is selected, smoothly pull it to the center of the geodesic core
+      if (selectedNode === n) {
+        sx = cx + r.x * 16;
+        sy = cy + r.y * 16;
+        cardScale = 1.08;
+        zIdx = 600;
+      }
+
+      // Draw radial tether line from geodesic surface to the card
+      const lineAlpha = Math.max(0.16, Math.min(0.75, 0.35 + r.z * 0.35));
+      ctx.strokeStyle = `rgba(235, 240, 248, ${lineAlpha.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(sx, sy);
+      ctx.stroke();
+
+      // Depth-based brightness for cards behind the core
+      const brightness = selectedNode === n ? 1.05 : Math.max(0.45, Math.min(1.05, 0.78 + r.z * 0.32));
+      n.el.style.zIndex = String(zIdx);
+      n.el.style.filter = `brightness(${brightness.toFixed(2)})`;
+      n.el.style.transform = `translate3d(${(sx - 71).toFixed(1)}px, ${(sy - 51).toFixed(1)}px, 0) scale(${cardScale.toFixed(3)})`;
+    }
+
+    // Draw back-hemisphere geodesic wireframe edges
+    ctx.lineWidth = 1.0;
+    for (let i = 0; i < coreEdges.length; i++) {
+      const [a, b] = coreEdges[i];
+      const va = projVerts[a];
+      const vb = projVerts[b];
+      const avgZ = (va.z + vb.z) * 0.5;
+      if (avgZ < 0) {
+        ctx.strokeStyle = 'rgba(210, 215, 225, 0.35)';
+        ctx.beginPath();
+        ctx.moveTo(va.sx, va.sy);
+        ctx.lineTo(vb.sx, vb.sy);
+        ctx.stroke();
+      }
+    }
+
+    // Draw the luminous solid white inner sphere inside the geodesic cage (matching the recording)
+    const innerR = coreRadius * 0.74;
+    const glowGrad = ctx.createRadialGradient(cx, cy, innerR * 0.2, cx, cy, coreRadius * 1.05);
+    glowGrad.addColorStop(0, '#ffffff');
+    glowGrad.addColorStop(0.68, '#ffffff');
+    glowGrad.addColorStop(0.82, 'rgba(255, 255, 255, 0.35)');
+    glowGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, coreRadius * 1.05, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw front-hemisphere geodesic wireframe lattice over the glowing core
+    ctx.lineWidth = 1.25;
+    for (let i = 0; i < coreEdges.length; i++) {
+      const [a, b] = coreEdges[i];
+      const va = projVerts[a];
+      const vb = projVerts[b];
+      const avgZ = (va.z + vb.z) * 0.5;
+      if (avgZ >= 0) {
+        const alpha = 0.55 + avgZ * 0.45;
+        ctx.strokeStyle = `rgba(245, 247, 250, ${alpha.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.moveTo(va.sx, va.sy);
+        ctx.lineTo(vb.sx, vb.sy);
+        ctx.stroke();
+      }
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

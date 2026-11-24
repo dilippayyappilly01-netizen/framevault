@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Infinite 3D Grid Tunnel Carousel</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #000000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #stage {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    #stage:active {
+      cursor: grabbing;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .ui-controls {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      display: flex;
+      gap: 8px;
+      z-index: 40;
+    }
+
+    .ui-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.14);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .ui-btn svg {
+      width: 15px;
+      height: 15px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="ui-controls">
+    <button class="ui-btn" id="reverseBtn" title="Reverse Flight Direction">
+      <svg viewBox="0 0 24 24">
+        <polyline points="1 4 1 10 7 10"></polyline>
+        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+      </svg>
+    </button>
+    <button class="ui-btn" id="pauseBtn" title="Pause / Resume">
+      <svg viewBox="0 0 24 24" id="pauseIcon">
+        <line x1="9" y1="6" x2="9" y2="18"></line>
+        <line x1="15" y1="6" x2="15" y2="18"></line>
+      </svg>
+    </button>
+  </div>
+
+  <div id="stage">
+    <canvas id="tunnelCanvas"></canvas>
+  </div>
+
+  <script>
+    const IMAGES = [
+      'images/1.jpg',
+      'images/2.jpg',
+      'images/3.jpg',
+      'images/4.jpg',
+      'images/5.jpg',
+      'images/6.jpg',
+      'images/7.jpg',
+      'images/8.jpg',
+      'images/9.jpg',
+      'images/10.jpg',
+      'images/11.jpg',
+      'images/12.jpg'
+    ];
+
+    const COLORS = ['#ef4444', '#2563eb', '#16a34a', '#eab308', '#f97316', '#9333ea'];
+
+    const canvas = document.getElementById('tunnelCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const stage = document.getElementById('stage');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const pauseIcon = document.getElementById('pauseIcon');
+    const reverseBtn = document.getElementById('reverseBtn');
+
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    let dpr = Math.min(Math.max(window.devicePixelRatio || 1, 2), 2.5);
+
+    function resize() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      dpr = Math.min(Math.max(window.devicePixelRatio || 1, 2), 2.5);
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Load all 12 high-resolution user photos into square textures
+    const TOTAL_IMGS = IMAGES.length;
+    const textures = new Array(TOTAL_IMGS).fill(null);
+    const TEX_SIZE = 700;
+
+    IMAGES.forEach((src, idx) => {
+      const img = new Image();
+      img.decoding = 'sync';
+      img.onload = () => {
+        const off = document.createElement('canvas');
+        off.width = TEX_SIZE;
+        off.height = TEX_SIZE;
+        const octx = off.getContext('2d');
+        octx.imageSmoothingEnabled = true;
+        octx.imageSmoothingQuality = 'high';
+        const minDim = Math.min(img.naturalWidth, img.naturalHeight);
+        const sx = (img.naturalWidth - minDim) * 0.5;
+        const sy = (img.naturalHeight - minDim) * 0.5;
+        octx.drawImage(img, sx, sy, minDim, minDim, 0, 0, TEX_SIZE, TEX_SIZE);
+        textures[idx] = off;
+      };
+      img.src = src;
+    });
+
+    // Helper to draw a textured quad (two triangles) in 3D perspective
+    function drawQuadImg(img, x0, y0, x1, y1, x2, y2, x3, y3, alpha) {
+      if (alpha <= 0.01) return;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      drawTri(img, 0, 0, TEX_SIZE, 0, TEX_SIZE, TEX_SIZE, x0, y0, x1, y1, x2, y2);
+      drawTri(img, 0, 0, TEX_SIZE, TEX_SIZE, 0, TEX_SIZE, x0, y0, x2, y2, x3, y3);
+      ctx.restore();
+    }
+
+    function drawTri(img, u0, v0, u1, v1, u2, v2, x0, y0, x1, y1, x2, y2) {
+      const cx = (x0 + x1 + x2) / 3;
+      const cy = (y0 + y1 + y2) / 3;
+      const expand = 0.4;
+      const l0 = Math.hypot(x0 - cx, y0 - cy) || 1;
+      const l1 = Math.hypot(x1 - cx, y1 - cy) || 1;
+      const l2 = Math.hypot(x2 - cx, y2 - cy) || 1;
+      const ex0 = x0 + ((x0 - cx) / l0) * expand;
+      const ey0 = y0 + ((y0 - cy) / l0) * expand;
+      const ex1 = x1 + ((x1 - cx) / l1) * expand;
+      const ey1 = y1 + ((y1 - cy) / l1) * expand;
+      const ex2 = x2 + ((x2 - cx) / l2) * expand;
+      const ey2 = y2 + ((y2 - cy) / l2) * expand;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(ex0, ey0);
+      ctx.lineTo(ex1, ey1);
+      ctx.lineTo(ex2, ey2);
+      ctx.closePath();
+      ctx.clip();
+
+      const du1 = u1 - u0, dv1 = v1 - v0;
+      const du2 = u2 - u0, dv2 = v2 - v0;
+      const det = du1 * dv2 - du2 * dv1;
+      if (Math.abs(det) > 1e-6) {
+        const inv = 1 / det;
+        const dx1 = x1 - x0, dy1 = y1 - y0;
+        const dx2 = x2 - x0, dy2 = y2 - y0;
+        const a = (dx1 * dv2 - dx2 * dv1) * inv;
+        const b = (dy1 * dv2 - dy2 * dv1) * inv;
+        const c = (dx2 * du1 - dx1 * du2) * inv;
+        const d = (dy2 * du1 - dy1 * du2) * inv;
+        const e = x0 - a * u0 - c * v0;
+        const f = y0 - b * u0 - d * v0;
+        ctx.transform(a, b, c, d, e, f);
+        ctx.drawImage(img, 0, 0);
+      }
+      ctx.restore();
+    }
+
+    // Deterministic hash for cell content (photo vs color tile vs empty black cell)
+    function cellHash(wallId, lane, depthIdx) {
+      let n = (wallId * 73856093) ^ (lane * 19349663) ^ (depthIdx * 83492791);
+      n = ((n >> 13) ^ n) * 1274126177;
+      return Math.abs(n);
+    }
+
+    // Tunnel Dimensions: 5x5 grid cross-section
+    const COLS = 5;
+    const ROWS = 4;
+    const DEPTH_SLICES = 14;
+
+    let cameraZ = 0;
+    let targetZ = 0;
+    let dir = 1;
+    let isPaused = false;
+    let isDragging = false;
+    let lastY = 0;
+    let lastTime = 0;
+    let velocity = 0;
+
+    function project(wx, wy, wz) {
+      const fov = Math.min(width, height) * 0.72;
+      const scale = fov / Math.max(0.08, wz);
+      return {
+        x: width * 0.5 + wx * scale,
+        y: height * 0.5 + wy * scale
+      };
+    }
+
+    function renderTunnel() {
+      if (!isDragging && !isPaused) {
+        targetZ += 0.018 * dir;
+      }
+      if (!isDragging) {
+        cameraZ += (targetZ - cameraZ) * 0.12;
+      } else {
+        cameraZ = targetZ;
+      }
+
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, width, height);
+
+      const baseSlice = Math.floor(cameraZ);
+      const fracZ = cameraZ - baseSlice;
+
+      const halfW = 2.5;
+      const halfH = 2.0;
+      const sliceLen = 1.0;
+
+      // Render from farthest slice to nearest slice (Painter's algorithm)
+      for (let s = DEPTH_SLICES; s >= 0; s--) {
+        const worldSlice = baseSlice + s;
+        const zNear = (s - fracZ) * sliceLen + 0.35;
+        const zFar = (s + 1 - fracZ) * sliceLen + 0.35;
+        if (zNear <= 0.1) continue;
+
+        const fogAlpha = Math.min(1, Math.max(0, 1 - (s - fracZ) / (DEPTH_SLICES - 0.5)));
+
+        // 1. TOP & BOTTOM WALLS (5 columns across X)
+        for (let c = 0; c < COLS; c++) {
+          const x0 = -halfW + (c / COLS) * (halfW * 2);
+          const x1 = -halfW + ((c + 1) / COLS) * (halfW * 2);
+
+          // Top wall (wy = -halfH)
+          drawCell(0, c, worldSlice, x0, -halfH, zNear, x1, -halfH, zNear, x1, -halfH, zFar, x0, -halfH, zFar, fogAlpha);
+          // Bottom wall (wy = +halfH)
+          drawCell(1, c, worldSlice, x0, halfH, zFar, x1, halfH, zFar, x1, halfH, zNear, x0, halfH, zNear, fogAlpha);
+        }
+
+        // 2. LEFT & RIGHT WALLS (4 rows across Y)
+        for (let r = 0; r < ROWS; r++) {
+          const y0 = -halfH + (r / ROWS) * (halfH * 2);
+          const y1 = -halfH + ((r + 1) / ROWS) * (halfH * 2);
+
+          // Left wall (wx = -halfW)
+          drawCell(2, r, worldSlice, -halfW, y0, zNear, -halfW, y0, zFar, -halfW, y1, zFar, -halfW, y1, zNear, fogAlpha);
+          // Right wall (wx = +halfW)
+          drawCell(3, r, worldSlice, halfW, y0, zFar, halfW, y0, zNear, halfW, y1, zNear, halfW, y1, zFar, fogAlpha);
+        }
+      }
+
+      requestAnimationFrame(renderTunnel);
+    }
+
+    function drawCell(wallId, lane, sliceIdx, wx0, wy0, wz0, wx1, wy1, wz1, wx2, wy2, wz2, wx3, wy3, wz3, alpha) {
+      const p0 = project(wx0, wy0, wz0);
+      const p1 = project(wx1, wy1, wz1);
+      const p2 = project(wx2, wy2, wz2);
+      const p3 = project(wx3, wy3, wz3);
+
+      const h = cellHash(wallId, lane, sliceIdx);
+      const mod = h % 10;
+
+      if (mod < 3) {
+        // High-res Photo cell (30% of cells)
+        const photoIdx = h % TOTAL_IMGS;
+        const tex = textures[photoIdx];
+        if (tex) {
+          drawQuadImg(tex, p0.x, p0.y, p1.x, p1.y, p2.x, p2.y, p3.x, p3.y, alpha);
+        }
+      } else if (mod < 5) {
+        // Vibrant Color Tile cell (20% of cells)
+        const color = COLORS[h % COLORS.length];
+        ctx.save();
+        ctx.globalAlpha = alpha * 0.92;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(p0.x, p0.y);
+        ctx.lineTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.lineTo(p3.x, p3.y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Crisp white wireframe grid border
+      ctx.save();
+      ctx.strokeStyle = `rgba(255, 255, 255, ${(alpha * 0.42).toFixed(3)})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(p0.x, p0.y);
+      ctx.lineTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.lineTo(p3.x, p3.y);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    stage.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      lastY = e.clientY;
+      lastTime = performance.now();
+      velocity = 0;
+      stage.setPointerCapture(e.pointerId);
+    });
+
+    stage.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const now = performance.now();
+      const dy = e.clientY - lastY;
+      const dt = Math.max(1, now - lastTime);
+
+      const dZ = dy * 0.015;
+      targetZ += dZ;
+      velocity = dZ / dt;
+
+      lastY = e.clientY;
+      lastTime = now;
+    });
+
+    function endDrag() {
+      if (!isDragging) return;
+      isDragging = false;
+      targetZ += velocity * 140;
+    }
+
+    stage.addEventListener('pointerup', endDrag);
+    stage.addEventListener('pointercancel', endDrag);
+
+    window.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      targetZ += e.deltaY * 0.005;
+    }, { passive: false });
+
+    pauseBtn.addEventListener('click', () => {
+      isPaused = !isPaused;
+      if (isPaused) {
+        pauseIcon.innerHTML = `<polygon points="8 5 19 12 8 19 8 5" fill="currentColor"></polygon>`;
+      } else {
+        pauseIcon.innerHTML = `<line x1="9" y1="6" x2="9" y2="18"></line><line x1="15" y1="6" x2="15" y2="18"></line>`;
+      }
+    });
+
+    reverseBtn.addEventListener('click', () => {
+      dir *= -1;
+    });
+
+    requestAnimationFrame(renderTunnel);
+  </script>
+</body>
+</html>

@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OriginKit — Cobalt Plasma Containment Sphere (Orb 01 Adapted)</title>
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* ========================================================================
+       SCOPED COMPONENT STYLES — .ok-orb-page / .ok-orb-module
+       All layout & canvas rules are strictly scoped (no global overflow lock).
+       ======================================================================== */
+    .ok-orb-page {
+      padding: 40px 0 88px;
+    }
+
+    .ok-orb-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.85fr);
+      gap: 28px;
+      align-items: stretch;
+    }
+
+    @media (max-width: 960px) {
+      .ok-orb-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Scoped WebGL Stage Card */
+    .ok-orb-stage-card {
+      position: relative;
+      min-height: 520px;
+      height: 560px;
+      border-radius: 20px;
+      overflow: hidden;
+      background: #09090b;
+      box-shadow: var(--border-card-inset);
+      border: 1px solid var(--border-subtle);
+      isolation: isolate;
+      user-select: none;
+    }
+
+    html.dark .ok-orb-stage-card {
+      background: #0b0b0e;
+      border-color: var(--border-strong);
+    }
+
+    @media (max-width: 640px) {
+      .ok-orb-stage-card {
+        min-height: 400px;
+        height: 420px;
+      }
+    }
+
+    .ok-orb-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .ok-orb-canvas:active {
+      cursor: grabbing;
+    }
+
+    /* Stage HUD Overlays (pointer-events: none so drag stays unobstructed) */
+    .ok-orb-hud-top {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .ok-orb-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(9, 9, 11, 0.62);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      color: #fafafa;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.02em;
+    }
+
+    .ok-orb-badge-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--accent-primary);
+      box-shadow: 0 0 10px var(--accent-primary);
+    }
+
+    .ok-orb-hud-bottom {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .ok-orb-hint {
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(9, 9, 11, 0.56);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: rgba(250, 250, 250, 0.78);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .ok-orb-reset-btn {
+      pointer-events: auto;
+      appearance: none;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(9, 9, 11, 0.66);
+      color: #fafafa;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transition: background 0.16s ease, border-color 0.16s ease;
+    }
+
+    .ok-orb-reset-btn:hover {
+      background: rgba(37, 99, 235, 0.35);
+      border-color: rgba(96, 165, 250, 0.5);
+    }
+
+    .ok-orb-fallback {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      color: rgba(250, 250, 250, 0.8);
+      font-size: 14px;
+    }
+
+    /* Info & Controls Side Panel */
+    .ok-orb-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 28px;
+      border-radius: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--border-card-inset);
+    }
+
+    .ok-orb-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent-primary);
+      margin-bottom: 10px;
+    }
+
+    .ok-orb-title {
+      font-size: clamp(24px, 2.8vw, 32px);
+      font-weight: 600;
+      line-height: 1.15;
+      letter-spacing: -0.025em;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+    }
+
+    .ok-orb-desc {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    .ok-orb-tokens {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .ok-orb-section-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+
+    .ok-orb-swatch-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .ok-orb-swatch {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 10px;
+      border-radius: 12px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .ok-orb-swatch-chip {
+      height: 22px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+    }
+
+    .ok-orb-swatch-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .ok-orb-swatch-hex {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .ok-orb-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .ok-orb-control-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .ok-orb-control-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .ok-orb-control-val {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .ok-orb-range {
+      width: 100%;
+      accent-color: var(--accent-primary);
+      cursor: pointer;
+    }
+
+    .ok-orb-meta-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .ok-orb-meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .ok-orb-back-link {
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+  </style>
+</head>
+<body>
+  <!-- TOP NAVIGATION BAR (Reusing OriginKit styles.css Glass Header) -->
+  <header class="ok-topbar">
+    <div class="ok-topbar-inner">
+      <div class="ok-topbar-left">
+        <a href="index.html" class="ok-brand" title="Back to OriginKit Library">
+          <svg class="ok-brand-svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <rect x="2" y="2" width="5.5" height="5.5" rx="1.2"/>
+            <rect x="9.25" y="2" width="5.5" height="5.5" rx="1.2"/>
+            <rect x="9.25" y="9.25" width="5.5" height="5.5" rx="1.2" opacity="0.5"/>
+            <rect x="16.5" y="9.25" width="5.5" height="5.5" rx="1.2"/>
+            <rect x="2" y="16.5" width="5.5" height="5.5" rx="1.2"/>
+            <rect x="16.5" y="16.5" width="5.5" height="5.5" rx="1.2"/>
+          </svg>
+          <span class="ok-brand-title">OriginKit</span>
+          <span class="ok-brand-badge">orbs/orb-1</span>
+        </a>
+      </div>
+
+      <div class="ok-topbar-actions">
+        <a href="index.html" class="ok-btn-secondary ok-orb-back-link">← Library</a>
+        <button class="ok-theme-btn" id="btnThemeToggle" type="button" title="Toggle Light / Dark theme" aria-label="Toggle color theme">
+          <svg class="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          <svg class="icon-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="ok-orb-page">
+    <div class="ok-container">
+      <section class="ok-orb-grid" aria-label="Adapted Orb 01 Showcase">
+        <!-- SCOPED WEBGL 3D CONTAINMENT STAGE -->
+        <div class="ok-orb-stage-card" id="okOrbStage">
+          <canvas class="ok-orb-canvas" id="okOrbCanvas" aria-label="Interactive 3D Cobalt Plasma Containment Sphere"></canvas>
+
+          <div class="ok-orb-hud-top">
+            <span class="ok-orb-badge">
+              <span class="ok-orb-badge-dot" aria-hidden="true"></span>
+              <span>WEBGL 3D · 28-STEP RAYMARCH</span>
+            </span>
+            <span class="ok-orb-badge" id="orbThemeTag">LIGHT · #0B4DFF</span>
+          </div>
+
+          <div class="ok-orb-hud-bottom">
+            <span class="ok-orb-hint">Drag to orbit · Double-click to reset</span>
+            <button type="button" class="ok-orb-reset-btn" id="btnResetOrb">Reset View</button>
+          </div>
+
+          <div class="ok-orb-fallback" id="orbFallback">
+            WebGL is unavailable in this browser context.
+          </div>
+        </div>
+
+        <!-- DETAILS & LIVE CONTROLS -->
+        <aside class="ok-orb-panel">
+          <div>
+            <div class="ok-orb-eyebrow">OriginKit MCP · Adapted Component</div>
+            <h1 class="ok-orb-title">Cobalt Plasma Containment Core</h1>
+            <p class="ok-orb-desc">
+              Remixed from <code>orbs/orb-1</code> to match OriginKit's <code>styles.css</code> tokens.
+              Volumetric ridge filaments, concentric orbital rings, micro-sparks, and Fresnel glass lighting
+              are preserved at 60fps while shader pigments map natively to normalized cobalt RGB uniforms.
+            </p>
+          </div>
+
+          <div class="ok-orb-tokens">
+            <div class="ok-orb-section-label">Normalized GLSL Palette Uniforms</div>
+            <div class="ok-orb-swatch-row">
+              <div class="ok-orb-swatch">
+                <div class="ok-orb-swatch-chip" id="swatchDeep" style="background: #003be0;"></div>
+                <span class="ok-orb-swatch-name">Deep Cobalt</span>
+                <span class="ok-orb-swatch-hex" id="hexDeep">#003BE0</span>
+              </div>
+              <div class="ok-orb-swatch">
+                <div class="ok-orb-swatch-chip" id="swatchBright" style="background: #3b82f6;"></div>
+                <span class="ok-orb-swatch-name">Electric Mid</span>
+                <span class="ok-orb-swatch-hex" id="hexBright">#3B82F6</span>
+              </div>
+              <div class="ok-orb-swatch">
+                <div class="ok-orb-swatch-chip" id="swatchCore" style="background: #eef4ff;"></div>
+                <span class="ok-orb-swatch-name">Core White</span>
+                <span class="ok-orb-swatch-hex" id="hexCore">#EEF4FF</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="ok-orb-controls">
+            <div>
+              <div class="ok-orb-control-row">
+                <label class="ok-orb-control-label" for="speedSlider">Plasma Flow Speed</label>
+                <span class="ok-orb-control-val" id="speedVal">1.00×</span>
+              </div>
+              <input class="ok-orb-range" id="speedSlider" type="range" min="0.2" max="2.2" step="0.05" value="1.0">
+            </div>
+
+            <div>
+              <div class="ok-orb-control-row">
+                <label class="ok-orb-control-label" for="spinSlider">Idle Orbit Velocity</label>
+                <span class="ok-orb-control-val" id="spinVal">1.00×</span>
+              </div>
+              <input class="ok-orb-range" id="spinSlider" type="range" min="0" max="2.5" step="0.05" value="1.0">
+            </div>
+          </div>
+
+          <div class="ok-orb-meta-list">
+            <span class="ok-orb-meta-pill">ResizeObserver</span>
+            <span class="ok-orb-meta-pill">DPR ≤ 2</span>
+            <span class="ok-orb-meta-pill">Pointer Capture</span>
+            <span class="ok-orb-meta-pill">Zero External Deps</span>
+          </div>
+        </aside>
+      </section>
+    </div>
+  </main>
+
+  <script>
+  (() => {
+    /**
+     * Normalized sRGB vec3 palettes derived directly from OriginKit styles.css tokens:
+     * - Light Mode: --accent-primary (#0b4dff), --accent-primary-hover (#003be0), --ink-pill-bg (#09090b)
+     * - Dark Mode:  --accent-primary (#2563eb), --accent-primary-hover (#3b82f6), --bg-card (#111114)
+     */
+    const PALETTES = {
+      light: {
+        label: 'LIGHT · #0B4DFF',
+        deepHex: '#003BE0',
+        brightHex: '#2E74FF',
+        coreHex: '#EEF4FF',
+        bg:     [9 / 255,   9 / 255,   11 / 255],   // #09090b
+        deep:   [0 / 255,   59 / 255,  224 / 255],  // #003be0
+        mid:    [11 / 255,  77 / 255,  255 / 255],  // #0b4dff
+        bright: [78 / 255,  148 / 255, 255 / 255],  // electric cobalt-ice highlight
+        core:   [238 / 255, 244 / 255, 255 / 255],  // #eef4ff
+        rim:    [46 / 255,  116 / 255, 255 / 255],  // crisp cobalt glass Fresnel
+      },
+      dark: {
+        label: 'DARK · #2563EB',
+        deepHex: '#1D4ED8',
+        brightHex: '#60A5FA',
+        coreHex: '#F0F7FF',
+        bg:     [11 / 255,  11 / 255,  14 / 255],   // #0b0b0e
+        deep:   [29 / 255,  78 / 255,  216 / 255],  // #1d4ed8
+        mid:    [37 / 255,  99 / 255,  235 / 255],  // #2563eb
+        bright: [96 / 255,  165 / 255, 250 / 255],  // #60a5fa
+        core:   [240 / 255, 247 / 255, 255 / 255],  // #f0f7ff
+        rim:    [59 / 255,  130 / 255, 246 / 255],  // #3b82f6
+      },
+    };
+
+    function mountCobaltOrb(stageEl, canvasEl, fallbackEl) {
+      const gl =
+        canvasEl.getContext('webgl2', { antialias: true, alpha: false, powerPreference: 'high-performance' }) ||
+        canvasEl.getContext('webgl', { antialias: true, alpha: false, powerPreference: 'high-performance' });
+
+      if (!gl) {
+        if (fallbackEl) fallbackEl.style.display = 'flex';
+        return { setTheme() {}, setFlowSpeed() {}, setSpinSpeed() {}, resetView() {}, destroy() {} };
+      }
+
+      const vsSource = `
+        attribute vec2 aPos;
+        varying vec2 vUv;
+        void main() {
+          vUv = aPos;
+          gl_Position = vec4(aPos, 0.0, 1.0);
+        }
+      `;
+
+      // Volumetric 3D Plasma Tendril & Glass Containment Sphere Shader (adapted from orbs/orb-1)
+      // Preserves exact 28-step raymarching, ridge turbulence, orbital rings, micro-sparks,
+      // and top-left Fresnel glass rim while driving color grading from OriginKit CSS tokens.
+      const fsSource = `
+        precision highp float;
+        varying vec2 vUv;
+
+        uniform vec2 uResolution;
+        uniform float uTime;
+        uniform mat3 uRot;
+
+        uniform vec3 uBgColor;
+        uniform vec3 uDeepColor;
+        uniform vec3 uMidColor;
+        uniform vec3 uBrightColor;
+        uniform vec3 uCoreColor;
+        uniform vec3 uRimColor;
+
+        float hash(vec3 p) {
+          p = fract(p * vec3(443.897, 441.423, 437.195));
+          p += dot(p, p.yzx + 19.19);
+          return fract((p.x + p.y) * p.z);
+        }
+
+        float noise(vec3 p) {
+          vec3 i = floor(p);
+          vec3 f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+
+          return mix(
+            mix(
+              mix(hash(i + vec3(0,0,0)), hash(i + vec3(1,0,0)), f.x),
+              mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x),
+              f.y
+            ),
+            mix(
+              mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+              mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x),
+              f.y
+            ),
+            f.z
+          );
+        }
+
+        float filamentField(vec3 p, float t) {
+          vec3 q = p;
+          vec3 warp = vec3(
+            noise(q * 2.4 + vec3(t * 0.35, -t * 0.25, 0.0)),
+            noise(q * 2.4 + vec3(0.0, t * 0.30, -t * 0.28)),
+            noise(q * 2.4 + vec3(-t * 0.22, 0.0, t * 0.32))
+          ) - 0.5;
+          q += warp * 0.52;
+
+          float n1 = abs(noise(q * 3.8 + t * 0.25) - 0.5);
+          float n2 = abs(noise(q * 7.6 - t * 0.35 + warp * 1.4) - 0.5);
+          float n3 = abs(noise(q * 15.2 + t * 0.45) - 0.5);
+
+          float r1 = smoothstep(0.14, 0.0, n1);
+          float r2 = smoothstep(0.11, 0.0, n2);
+          float r3 = smoothstep(0.08, 0.0, n3);
+
+          return r1 * r2 * 2.4 + r1 * 0.35 + r2 * r3 * 1.35;
+        }
+
+        float sparkField(vec3 p, float t) {
+          vec3 q = p * 14.0 + vec3(sin(t * 0.2), cos(t * 0.17), sin(t * 0.13));
+          vec3 cell = floor(q);
+          vec3 fracP = fract(q) - 0.5;
+          float h = hash(cell);
+          if (h < 0.84) return 0.0;
+          vec3 jitter = (vec3(hash(cell + 1.1), hash(cell + 2.3), hash(cell + 3.7)) - 0.5) * 0.55;
+          float d = length(fracP - jitter);
+          float twinkle = 0.5 + 0.5 * sin(t * 3.5 + h * 40.0);
+          return smoothstep(0.11, 0.01, d) * twinkle * 1.4;
+        }
+
+        void main() {
+          vec2 uv = vUv;
+          float aspect = uResolution.x / max(uResolution.y, 1.0);
+          if (aspect >= 1.0) {
+            uv.x *= aspect;
+          } else {
+            uv.y /= max(aspect, 0.001);
+          }
+
+          float R = 0.73;
+          float r2d = length(uv);
+
+          // Stage background + outer atmospheric cobalt halo
+          vec3 col = uBgColor;
+          float topLeftBias = 0.65 + 0.35 * dot(normalize(uv + vec2(1e-5)), normalize(vec2(-0.65, 0.76)));
+          float outerHalo = exp(-max(0.0, r2d - R) * 14.0) * smoothstep(R + 0.24, R - 0.02, r2d);
+          col += uRimColor * outerHalo * 0.22 * topLeftBias;
+
+          if (r2d > R + 0.004) {
+            gl_FragColor = vec4(col, 1.0);
+            return;
+          }
+
+          vec2 p2 = uv / R;
+          float rNorm = length(p2);
+          float zSurf = sqrt(max(0.0, 1.0 - rNorm * rNorm));
+          vec3 nSurf = vec3(p2, zSurf);
+
+          const int STEPS = 28;
+          float totalLen = 2.0 * zSurf;
+          float stepSize = totalLen / float(STEPS);
+
+          vec3 accumPlasma = vec3(0.0);
+          float t = uTime;
+
+          for (int i = 0; i < STEPS; i++) {
+            float fi = (float(i) + 0.5) / float(STEPS);
+            float z = zSurf - fi * totalLen;
+            vec3 pos = vec3(p2.x, p2.y, z);
+            float rad = length(pos);
+
+            vec3 rp = uRot * pos;
+
+            float innerShell = smoothstep(0.82, 0.42, rad) * smoothstep(0.04, 0.24, rad);
+            float coreCluster = exp(-rad * rad * 18.0);
+
+            float fil = filamentField(rp, t);
+
+            float latRing1 = exp(-pow((length(rp.xy) - 0.54) * 28.0, 2.0)) * exp(-abs(rp.z) * 10.0);
+            float latRing2 = exp(-pow((length(rp.yz) - 0.46) * 32.0, 2.0)) * exp(-abs(rp.x) * 10.0);
+            float latRing3 = exp(-pow((length(rp.xz) - 0.62) * 30.0, 2.0)) * exp(-abs(rp.y) * 10.0);
+            float orbitalRings = (latRing1 + latRing2 + latRing3) * 0.55;
+
+            float sparks = sparkField(rp, t) * smoothstep(0.84, 0.25, rad);
+
+            float intensity = fil * innerShell * (1.0 + coreCluster * 2.2) + orbitalRings;
+            vec3 sampleCol = mix(uDeepColor, uBrightColor, clamp(fil * 0.65 + coreCluster, 0.0, 1.0));
+            sampleCol = mix(sampleCol, uCoreColor, clamp(coreCluster * 1.2 + pow(fil, 2.4) * 0.35, 0.0, 1.0));
+
+            accumPlasma += (sampleCol * intensity + uCoreColor * sparks) * stepSize;
+          }
+
+          float coreDist = rNorm;
+          float coreBloom1 = exp(-coreDist * coreDist * 28.0) * 1.15;
+          float coreBloom2 = exp(-coreDist * coreDist * 6.5) * 0.48;
+          float coreBloom3 = exp(-coreDist * coreDist * 2.2) * 0.18;
+
+          vec3 interior = uBgColor * 0.65 + accumPlasma * 1.32;
+          interior += uCoreColor * coreBloom1;
+          interior += uBrightColor * coreBloom2;
+          interior += uMidColor * coreBloom3;
+
+          // Glass containment sphere Fresnel rim & top-left specular catchlight
+          float fresnel = pow(1.0 - zSurf, 2.65);
+          float rimEdge = pow(1.0 - zSurf, 7.5);
+          vec2 light2D = normalize(vec2(-0.62, 0.74));
+          float dirRim = 0.42 + 0.58 * clamp(dot(normalize(p2 + vec2(1e-5)), light2D) * 0.5 + 0.5, 0.0, 1.0);
+
+          vec3 keyLight = normalize(vec3(-0.55, 0.65, 0.52));
+          vec3 refl = reflect(vec3(0.0, 0.0, -1.0), nSurf);
+          float glassSpec = pow(max(0.0, dot(refl, keyLight)), 28.0) * fresnel;
+
+          vec3 glassRimCol = mix(uRimColor, uCoreColor, rimEdge);
+          vec3 sphereCol = interior;
+          sphereCol += glassRimCol * fresnel * dirRim * 0.88;
+          sphereCol += uCoreColor * rimEdge * dirRim * 0.52;
+          sphereCol += uCoreColor * glassSpec * 0.65;
+
+          float edgeAA = 1.0 - smoothstep(R - 0.003, R + 0.002, r2d);
+          vec3 toneMappedSphere = 1.0 - exp(-sphereCol * 1.15);
+          col = mix(col, toneMappedSphere, edgeAA);
+
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `;
+
+      function compile(type, src) {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+          console.error('[OriginKit Orb 01] Shader compile error:', gl.getShaderInfoLog(s));
+          gl.deleteShader(s);
+          return null;
+        }
+        return s;
+      }
+
+      const vs = compile(gl.VERTEX_SHADER, vsSource);
+      const fs = compile(gl.FRAGMENT_SHADER, fsSource);
+      if (!vs || !fs) {
+        if (fallbackEl) fallbackEl.style.display = 'flex';
+        return { setTheme() {}, setFlowSpeed() {}, setSpinSpeed() {}, resetView() {}, destroy() {} };
+      }
+
+      const prog = gl.createProgram();
+      gl.attachShader(prog, vs);
+      gl.attachShader(prog, fs);
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+        console.error('[OriginKit Orb 01] Program link error:', gl.getProgramInfoLog(prog));
+        if (fallbackEl) fallbackEl.style.display = 'flex';
+        return { setTheme() {}, setFlowSpeed() {}, setSpinSpeed() {}, resetView() {}, destroy() {} };
+      }
+      gl.useProgram(prog);
+
+      const quad = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+        gl.STATIC_DRAW
+      );
+
+      const aPos = gl.getAttribLocation(prog, 'aPos');
+      gl.enableVertexAttribArray(aPos);
+      gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+      const loc = {
+        uResolution:  gl.getUniformLocation(prog, 'uResolution'),
+        uTime:        gl.getUniformLocation(prog, 'uTime'),
+        uRot:         gl.getUniformLocation(prog, 'uRot'),
+        uBgColor:     gl.getUniformLocation(prog, 'uBgColor'),
+        uDeepColor:   gl.getUniformLocation(prog, 'uDeepColor'),
+        uMidColor:    gl.getUniformLocation(prog, 'uMidColor'),
+        uBrightColor: gl.getUniformLocation(prog, 'uBrightColor'),
+        uCoreColor:   gl.getUniformLocation(prog, 'uCoreColor'),
+        uRimColor:    gl.getUniformLocation(prog, 'uRimColor'),
+      };
+
+      // Smoothly interpolated palette state (60fps transitions on theme toggle)
+      let currentTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+      const clone3 = (arr) => [arr[0], arr[1], arr[2]];
+      const curPal = {
+        bg:     clone3(PALETTES[currentTheme].bg),
+        deep:   clone3(PALETTES[currentTheme].deep),
+        mid:    clone3(PALETTES[currentTheme].mid),
+        bright: clone3(PALETTES[currentTheme].bright),
+        core:   clone3(PALETTES[currentTheme].core),
+        rim:    clone3(PALETTES[currentTheme].rim),
+      };
+
+      function resize() {
+        const rect = stageEl.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = Math.max(1, Math.round(rect.width * dpr));
+        const h = Math.max(1, Math.round(rect.height * dpr));
+        if (canvasEl.width !== w || canvasEl.height !== h) {
+          canvasEl.width = w;
+          canvasEl.height = h;
+          gl.viewport(0, 0, w, h);
+        }
+      }
+
+      const resizeObserver = new ResizeObserver(resize);
+      resizeObserver.observe(stageEl);
+      resize();
+
+      // Exact Orb 01 rotation & spring damping physics
+      let rotX = 0.2;
+      let rotY = 0.0;
+      let targetRotX = 0.2;
+      let targetRotY = 0.0;
+      let isDragging = false;
+      let activePointerId = null;
+      let lastX = 0;
+      let lastY = 0;
+      let flowSpeed = 1.0;
+      let spinSpeed = 1.0;
+      let simTime = 0;
+      let lastNow = performance.now();
+      let rafId = 0;
+
+      function onPointerDown(e) {
+        isDragging = true;
+        activePointerId = e.pointerId;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        try { canvasEl.setPointerCapture(e.pointerId); } catch (_) {}
+      }
+
+      function onPointerMove(e) {
+        if (!isDragging || e.pointerId !== activePointerId) return;
+        const dx = e.clientX - lastX;
+        const dy = e.clientY - lastY;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        targetRotY += dx * 0.007;
+        targetRotX = Math.max(-1.3, Math.min(1.3, targetRotX + dy * 0.007));
+      }
+
+      function onPointerUp(e) {
+        if (e.pointerId !== activePointerId) return;
+        isDragging = false;
+        activePointerId = null;
+        try { canvasEl.releasePointerCapture(e.pointerId); } catch (_) {}
+      }
+
+      function resetView() {
+        targetRotX = 0.2;
+        targetRotY = 0.0;
+      }
+
+      canvasEl.addEventListener('pointerdown', onPointerDown);
+      canvasEl.addEventListener('pointermove', onPointerMove);
+      canvasEl.addEventListener('pointerup', onPointerUp);
+      canvasEl.addEventListener('pointercancel', onPointerUp);
+      canvasEl.addEventListener('dblclick', resetView);
+
+      function buildRot(rx, ry) {
+        const cx = Math.cos(rx), sx = Math.sin(rx);
+        const cy = Math.cos(ry), sy = Math.sin(ry);
+        return new Float32Array([
+          cy, sx * sy, -cx * sy,
+          0,  cx,       sx,
+          sy, -sx * cy, cx * cy
+        ]);
+      }
+
+      function lerp3(cur, tgt, factor) {
+        cur[0] += (tgt[0] - cur[0]) * factor;
+        cur[1] += (tgt[1] - cur[1]) * factor;
+        cur[2] += (tgt[2] - cur[2]) * factor;
+      }
+
+      function render(now) {
+        rafId = requestAnimationFrame(render);
+        const dt = Math.min((now - lastNow) * 0.001, 0.05);
+        lastNow = now;
+
+        if (document.hidden) return;
+
+        simTime += dt * flowSpeed;
+
+        if (!isDragging) {
+          targetRotY += 0.0022 * spinSpeed * (dt * 60);
+        }
+        rotX += (targetRotX - rotX) * 0.08;
+        rotY += (targetRotY - rotY) * 0.08;
+
+        const tgtPal = PALETTES[currentTheme];
+        lerp3(curPal.bg,     tgtPal.bg,     0.12);
+        lerp3(curPal.deep,   tgtPal.deep,   0.12);
+        lerp3(curPal.mid,    tgtPal.mid,    0.12);
+        lerp3(curPal.bright, tgtPal.bright, 0.12);
+        lerp3(curPal.core,   tgtPal.core,   0.12);
+        lerp3(curPal.rim,    tgtPal.rim,    0.12);
+
+        gl.uniform2f(loc.uResolution, canvasEl.width, canvasEl.height);
+        gl.uniform1f(loc.uTime, simTime);
+        gl.uniformMatrix3fv(loc.uRot, false, buildRot(rotX, rotY));
+
+        gl.uniform3fv(loc.uBgColor,     curPal.bg);
+        gl.uniform3fv(loc.uDeepColor,   curPal.deep);
+        gl.uniform3fv(loc.uMidColor,    curPal.mid);
+        gl.uniform3fv(loc.uBrightColor, curPal.bright);
+        gl.uniform3fv(loc.uCoreColor,   curPal.core);
+        gl.uniform3fv(loc.uRimColor,    curPal.rim);
+
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+      }
+
+      rafId = requestAnimationFrame(render);
+
+      return {
+        setTheme(mode) {
+          currentTheme = mode === 'dark' ? 'dark' : 'light';
+        },
+        setFlowSpeed(v) {
+          flowSpeed = v;
+        },
+        setSpinSpeed(v) {
+          spinSpeed = v;
+        },
+        resetView,
+        destroy() {
+          cancelAnimationFrame(rafId);
+          resizeObserver.disconnect();
+          canvasEl.removeEventListener('pointerdown', onPointerDown);
+          canvasEl.removeEventListener('pointermove', onPointerMove);
+          canvasEl.removeEventListener('pointerup', onPointerUp);
+          canvasEl.removeEventListener('pointercancel', onPointerUp);
+          canvasEl.removeEventListener('dblclick', resetView);
+          gl.deleteBuffer(quad);
+          gl.deleteShader(vs);
+          gl.deleteShader(fs);
+          gl.deleteProgram(prog);
+        },
+      };
+    }
+
+    // Mount controller
+    const stageEl = document.getElementById('okOrbStage');
+    const canvasEl = document.getElementById('okOrbCanvas');
+    const fallbackEl = document.getElementById('orbFallback');
+    const orb = mountCobaltOrb(stageEl, canvasEl, fallbackEl);
+
+    // Sync UI theme toggle + token swatches with styles.css html.dark class
+    const themeTag = document.getElementById('orbThemeTag');
+    const swatchDeep = document.getElementById('swatchDeep');
+    const swatchBright = document.getElementById('swatchBright');
+    const swatchCore = document.getElementById('swatchCore');
+    const hexDeep = document.getElementById('hexDeep');
+    const hexBright = document.getElementById('hexBright');
+    const hexCore = document.getElementById('hexCore');
+
+    function syncThemeUI(isDark) {
+      const key = isDark ? 'dark' : 'light';
+      const p = PALETTES[key];
+      document.documentElement.classList.toggle('dark', isDark);
+      orb.setTheme(key);
+      themeTag.textContent = p.label;
+      swatchDeep.style.background = p.deepHex;
+      swatchBright.style.background = p.brightHex;
+      swatchCore.style.background = p.coreHex;
+      hexDeep.textContent = p.deepHex;
+      hexBright.textContent = p.brightHex;
+      hexCore.textContent = p.coreHex;
+    }
+
+    // Initialize from stored OriginKit preference if present (safe under file://)
+    let savedTheme = null;
+    try { savedTheme = localStorage.getItem('ok_theme'); } catch (_) {}
+    syncThemeUI(savedTheme === 'dark');
+
+    document.getElementById('btnThemeToggle').addEventListener('click', () => {
+      const nextDark = !document.documentElement.classList.contains('dark');
+      try { localStorage.setItem('ok_theme', nextDark ? 'dark' : 'light'); } catch (_) {}
+      syncThemeUI(nextDark);
+    });
+
+    // Live interactive sliders
+    const speedSlider = document.getElementById('speedSlider');
+    const speedVal = document.getElementById('speedVal');
+    speedSlider.addEventListener('input', () => {
+      const v = parseFloat(speedSlider.value);
+      speedVal.textContent = v.toFixed(2) + '×';
+      orb.setFlowSpeed(v);
+    });
+
+    const spinSlider = document.getElementById('spinSlider');
+    const spinVal = document.getElementById('spinVal');
+    spinSlider.addEventListener('input', () => {
+      const v = parseFloat(spinSlider.value);
+      spinVal.textContent = v.toFixed(2) + '×';
+      orb.setSpinSpeed(v);
+    });
+
+    document.getElementById('btnResetOrb').addEventListener('click', () => orb.resetView());
+
+    // Release WebGL resources cleanly on unload
+    window.addEventListener('pagehide', () => orb.destroy());
+  })();
+  </script>
+</body>
+</html>

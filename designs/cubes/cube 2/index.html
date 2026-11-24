@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cube 02 — Refractive Smoked-Obsidian 2×2×2 Crystal Cube</title>
+<style>
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #f5f5f5;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    cursor: grab;
+  }
+
+  canvas:active {
+    cursor: grabbing;
+  }
+</style>
+</head>
+<body>
+<canvas id="glCanvas"></canvas>
+
+<script>
+(() => {
+  const canvas = document.getElementById('glCanvas');
+  const gl = canvas.getContext('webgl2', { antialias: true }) ||
+             canvas.getContext('webgl', { antialias: true });
+  if (!gl) return;
+
+  const vsSource = `
+    attribute vec2 aPos;
+    varying vec2 vUv;
+    void main() {
+      vUv = aPos;
+      gl_Position = vec4(aPos, 0.0, 1.0);
+    }
+  `;
+
+  // Full physically-based raymarched smoked-obsidian 2x2x2 divided glass cube shader
+  // Replicating the exact internal cross-partitions, amber/cyan chromatic dispersion bevels,
+  // deep black optical absorption, crisp Fresnel edges, and floor caustic glow patch from Cube 2 video
+  const fsSource = `
+    precision highp float;
+    varying vec2 vUv;
+
+    uniform vec2 uResolution;
+    uniform mat3 uRot;
+    uniform mat3 uInvRot;
+
+    // Rounded box SDF
+    float sdRoundBox(vec3 p, vec3 b, float r) {
+      vec3 q = abs(p) - b;
+      return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - r;
+    }
+
+    // 2x2x2 divided crystal cube SDF (outer beveled cube + internal seam grooves)
+    float mapCube(vec3 p) {
+      return sdRoundBox(p, vec3(0.92), 0.045);
+    }
+
+    // Sub-block SDF for the 8 quadrants of the 2x2x2 internal structure
+    float mapOctant(vec3 p) {
+      vec3 q = abs(p) - vec3(0.478);
+      return sdRoundBox(q, vec3(0.452), 0.024);
+    }
+
+    vec3 calcNormalOuter(vec3 p) {
+      vec2 e = vec2(0.0015, 0.0);
+      return normalize(vec3(
+        mapCube(p + e.xyy) - mapCube(p - e.xyy),
+        mapCube(p + e.yxy) - mapCube(p - e.yxy),
+        mapCube(p + e.yyx) - mapCube(p - e.yyx)
+      ));
+    }
+
+    vec3 calcNormalOctant(vec3 p) {
+      vec2 e = vec2(0.0015, 0.0);
+      return normalize(vec3(
+        mapOctant(p + e.xyy) - mapOctant(p - e.xyy),
+        mapOctant(p + e.yxy) - mapOctant(p - e.yxy),
+        mapOctant(p + e.yyx) - mapOctant(p - e.yyx)
+      ));
+    }
+
+    // Analytic ray-box bound for fast outer acceleration
+    vec2 intersectAABB(vec3 ro, vec3 rd, vec3 boxSize) {
+      vec3 m = 1.0 / rd;
+      vec3 n = m * ro;
+      vec3 k = abs(m) * boxSize;
+      vec3 t1 = -n - k;
+      vec3 t2 = -n + k;
+      float tN = max(max(t1.x, t1.y), t1.z);
+      float tF = min(min(t2.x, t2.y), t2.z);
+      return vec2(tN, tF);
+    }
+
+    // Studio environment lighting (bright white gallery + overhead softbox + warm/cool rim accents)
+    vec3 sampleStudioEnv(vec3 rd, float dispersionShift) {
+      vec3 bg = vec3(0.961);
+      // Overhead softbox window reflection
+      float topBox = smoothstep(0.35, 0.75, rd.y) * smoothstep(-0.65, 0.25, rd.z);
+      // Crisp studio strip lights
+      float strip1 = exp(-pow((rd.x - 0.55 - dispersionShift * 0.08) * 7.5, 2.0)) * smoothstep(-0.4, 0.8, rd.y);
+      float strip2 = exp(-pow((rd.y - 0.52 + dispersionShift * 0.06) * 8.0, 2.0)) * smoothstep(-0.6, 0.6, rd.x);
+      float strip3 = exp(-pow((rd.x + 0.62) * 9.0, 2.0)) * smoothstep(-0.7, 0.5, -rd.y);
+
+      vec3 light = bg * 0.12;
+      light += vec3(0.98, 0.99, 1.0) * topBox * 0.95;
+      light += vec3(1.0, 0.96, 0.90) * strip1 * 1.15;
+      light += vec3(0.92, 0.96, 1.0) * strip2 * 1.05;
+      light += vec3(0.95, 0.97, 1.0) * strip3 * 0.85;
+      return light;
+    }
+
+    void main() {
+      vec2 uv = vUv;
+      uv.x *= uResolution.x / max(uResolution.y, 1.0);
+
+      // Camera setup
+      vec3 roWorld = vec3(0.0, 0.0, 5.2);
+      vec3 rdWorld = normalize(vec3(uv * 0.46, -1.0));
+
+      // Transform ray into object space of the rotated cube
+      vec3 ro = uRot * roWorld;
+      vec3 rd = normalize(uRot * rdWorld);
+
+      vec3 bgCol = vec3(0.961, 0.961, 0.961);
+
+      // Subtle warm-white floor caustic / transmitted light patch behind/below the cube
+      // Matches the bright white oval caustic seen at 00:04-00:07 and 00:18-00:20 in the recording
+      vec3 lightDirObj = uRot * normalize(vec3(-0.25, 0.45, 0.85));
+      vec2 causticCenter = vec2(-lightDirObj.x * 0.28, -0.32 - lightDirObj.y * 0.22);
+      float causticDist = length((uv - causticCenter) * vec2(1.1, 1.35));
+      float causticGlow = exp(-causticDist * causticDist * 14.0) * 0.042;
+      bgCol = min(vec3(1.0), bgCol + vec3(1.0, 0.995, 0.985) * causticGlow);
+
+      vec2 bounds = intersectAABB(ro, rd, vec3(1.02));
+      if (bounds.x > bounds.y || bounds.y < 0.0) {
+        gl_FragColor = vec4(bgCol, 1.0);
+        return;
+      }
+
+      // Raymarch outer beveled cube surface
+      float t = max(0.0, bounds.x);
+      bool hit = false;
+      vec3 p;
+      for (int i = 0; i < 48; i++) {
+        p = ro + rd * t;
+        float d = mapCube(p);
+        if (abs(d) < 0.0012) {
+          hit = true;
+          break;
+        }
+        t += d;
+        if (t > bounds.y + 0.05) break;
+      }
+
+      if (!hit) {
+        // Soft anti-aliased edge silhouette
+        gl_FragColor = vec4(bgCol, 1.0);
+        return;
+      }
+
+      vec3 nObj = calcNormalOuter(p);
+      vec3 nWorld = normalize(uInvRot * nObj);
+
+      // View-dependent Fresnel reflectance (Schlick)
+      float cosTheta = clamp(dot(-rd, nObj), 0.0, 1.0);
+      float f0 = 0.055;
+      float fresnel = f0 + (1.0 - f0) * pow(1.0 - cosTheta, 4.2);
+
+      // Detect bevel proximity (where 2 or 3 faces meet on the outer cube)
+      vec3 ap = abs(p);
+      float edgeProx = clamp(
+        (max(min(ap.x, ap.y), min(max(ap.x, ap.y), ap.z)) - 0.885) / 0.08,
+        0.0,
+        1.0
+      );
+
+      // Detect proximity to the internal 2x2x2 cross partition planes (x=0, y=0, z=0)
+      vec3 refrRdG = refract(rd, nObj, 1.0 / 1.52);
+
+      // Trace internal 2x2x2 partition planes (x=0, y=0, z=0) inside the cube!
+      // In the video, the internal planes create crisp reflective & dispersive cross-hair planes
+      float internalReflection = 0.0;
+      vec3 internalChroma = vec3(0.0);
+
+      // Check intersection with x=0, y=0, z=0 planes inside [-0.965, 0.965]^3
+      vec3 tPlanes = -p / (refrRdG + vec3(1e-6));
+      for (int axis = 0; axis < 3; axis++) {
+        float tp = (axis == 0) ? tPlanes.x : ((axis == 1) ? tPlanes.y : tPlanes.z);
+        if (tp > 0.002 && tp < 2.2) {
+          vec3 hp = p + refrRdG * tp;
+          if (max(max(abs(hp.x), abs(hp.y)), abs(hp.z)) < 0.962) {
+            vec3 planeN = (axis == 0) ? vec3(1.0, 0.0, 0.0) : ((axis == 1) ? vec3(0.0, 1.0, 0.0) : vec3(0.0, 0.0, 1.0));
+            float pCos = abs(dot(refrRdG, planeN));
+            // Grazing reflection off the internal partition glass sheet
+            float pFresnel = pow(1.0 - pCos, 3.2);
+            float rimToOuter = smoothstep(0.35, 0.96, max(max(abs(hp.x), abs(hp.y)), abs(hp.z)));
+
+            // Warm amber/gold and cool sapphire/cyan chromatic dispersion on internal partitions
+            vec3 warmAmber = vec3(0.86, 0.62, 0.42);
+            vec3 coolCyan  = vec3(0.28, 0.58, 0.95);
+            float orient = dot(planeN, uRot * vec3(0.6, 0.5, 0.6));
+            vec3 partCol = mix(warmAmber, coolCyan, clamp(orient * 0.5 + 0.5, 0.0, 1.0));
+            partCol = mix(partCol, vec3(0.88, 0.90, 0.94), 0.45);
+
+            internalChroma += partCol * (0.14 + 0.52 * pFresnel) * (0.45 + 0.55 * rimToOuter);
+            internalReflection += 0.22 * pFresnel;
+          }
+        }
+      }
+
+      // Surface seam cross-lines where the x=0, y=0, z=0 partitions meet the outer faces
+      float minCoord = min(ap.x, min(ap.y, ap.z));
+      float seamLine = 1.0 - smoothstep(0.0, 0.016, minCoord);
+      float seamBevel = (1.0 - smoothstep(0.0, 0.042, minCoord)) * (1.0 - seamLine);
+
+      // Chromatic dispersion across R, G, B rays exiting the back of the smoked glass cube
+      vec3 rdR = refract(rd, nObj, 1.0 / 1.485);
+      vec3 rdG = refrRdG;
+      vec3 rdB = refract(rd, nObj, 1.0 / 1.565);
+
+      vec2 exitBounds = intersectAABB(p, rdG, vec3(0.965));
+      float thickness = max(0.1, exitBounds.y);
+
+      // Exit normal at back face
+      vec3 pExit = p + rdG * thickness;
+      vec3 nExit = -calcNormalOuter(pExit);
+
+      vec3 outR = uInvRot * refract(rdR, nExit, 1.485);
+      vec3 outG = uInvRot * refract(rdG, nExit, 1.520);
+      vec3 outB = uInvRot * refract(rdB, nExit, 1.565);
+
+      vec3 envR = sampleStudioEnv(outR, -1.0);
+      vec3 envG = sampleStudioEnv(outG,  0.0);
+      vec3 envB = sampleStudioEnv(outB,  1.0);
+      vec3 refractedEnv = vec3(envR.r, envG.g, envB.b);
+
+      // Deep pitch-black smoked obsidian optical absorption (keeps body mirror black, bevels crystal-clear)
+      float edgeTransmit = smoothstep(0.80, 0.962, sorted2nd(ap));
+      vec3 absorption = exp(-vec3(4.6, 4.7, 4.5) * thickness * (1.0 - edgeTransmit * 0.78));
+
+      vec3 transmitted = refractedEnv * absorption;
+
+      // Chromatic dispersion rainbow fringes along outer bevels (cobalt blue + warm amber/gold)
+      vec3 bevelChroma = vec3(
+        sampleStudioEnv(uInvRot * rdR, -1.8).r * 1.15,
+        sampleStudioEnv(uInvRot * rdG,  0.0).g * 0.95,
+        sampleStudioEnv(uInvRot * rdB,  1.8).b * 1.35
+      );
+      float bevelDispersionMask = edgeProx * (0.42 + 0.58 * (1.0 - cosTheta));
+
+      // Front surface studio reflection
+      vec3 reflDirWorld = reflect(rdWorld, nWorld);
+      vec3 surfaceRefl = sampleStudioEnv(reflDirWorld, 0.0);
+
+      // Crisp specular highlight on flat glass faces & bevel ridges
+      vec3 keyLight = normalize(vec3(-0.35, 0.65, 0.68));
+      vec3 rimLight = normalize(vec3(0.55, -0.45, 0.70));
+      float specKey = pow(max(0.0, dot(reflDirWorld, keyLight)), 48.0);
+      float specRim = pow(max(0.0, dot(reflDirWorld, rimLight)), 32.0);
+
+      vec3 col = transmitted * 0.45;
+      col += internalChroma * (0.04 + 0.36 * edgeTransmit) * exp(-thickness * 0.85);
+      col = mix(col, bevelChroma, bevelDispersionMask * 0.72);
+      col = mix(col, surfaceRefl * 0.72, clamp(fresnel * 1.15 + edgeProx * 0.38, 0.0, 0.90));
+
+      // Add internal cross-seam highlights & dark hairline groove
+      col += vec3(0.75, 0.68, 0.60) * seamBevel * 0.28;
+      col *= (1.0 - seamLine * 0.65);
+
+      // Bright studio catchlights
+      col += vec3(1.0, 0.99, 0.97) * specKey * 0.75;
+      col += vec3(0.75, 0.86, 1.0) * specRim * 0.45;
+
+      gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+    }
+  `
+  // Helper function injected at top of fragment shader for 2nd largest coordinate (bevel detection)
+  .replace(
+    'float sdRoundBox',
+    `float sorted2nd(vec3 a) {
+      return max(min(a.x, a.y), min(max(a.x, a.y), a.z));
+    }
+    float sdRoundBox`
+  );
+
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, vsSource));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fsSource));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+
+  const quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+    gl.STATIC_DRAW
+  );
+
+  const aPos = gl.getAttribLocation(prog, 'aPos');
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  const uResolution = gl.getUniformLocation(prog, 'uResolution');
+  const uRot = gl.getUniformLocation(prog, 'uRot');
+  const uInvRot = gl.getUniformLocation(prog, 'uInvRot');
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(window.innerWidth * dpr);
+    canvas.height = Math.round(window.innerHeight * dpr);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // Initial orientation matching 00:00 of the Cube 2 recording
+  let rotX = 0.48;
+  let rotY = -0.58;
+  let rotZ = 0.36;
+  let targetRotX = 0.48;
+  let targetRotY = -0.58;
+  let targetRotZ = 0.36;
+
+  let isDragging = false;
+  let lastX = 0;
+  let lastY = 0;
+
+  window.addEventListener('pointerdown', (e) => {
+    isDragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+
+    targetRotY += dx * 0.0085;
+    targetRotX += dy * 0.0085;
+  });
+
+  window.addEventListener('pointerup', () => {
+    isDragging = false;
+  });
+
+  function buildRotMatrices(rx, ry, rz) {
+    const cx = Math.cos(rx), sx = Math.sin(rx);
+    const cy = Math.cos(ry), sy = Math.sin(ry);
+    const cz = Math.cos(rz), sz = Math.sin(rz);
+
+    // R = Rz * Rx * Ry
+    const m00 = cz * cy - sz * sx * sy;
+    const m01 = -sz * cx;
+    const m02 = cz * sy + sz * sx * cy;
+
+    const m10 = sz * cy + cz * sx * sy;
+    const m11 = cz * cx;
+    const m12 = sz * sy - cz * sx * cy;
+
+    const m20 = -cx * sy;
+    const m21 = sx;
+    const m22 = cx * cy;
+
+    const rot = new Float32Array([
+      m00, m10, m20,
+      m01, m11, m21,
+      m02, m12, m22
+    ]);
+
+    const invRot = new Float32Array([
+      m00, m01, m02,
+      m10, m11, m12,
+      m20, m21, m22
+    ]);
+
+    return { rot, invRot };
+  }
+
+  function render(now) {
+    const t = now * 0.001;
+
+    if (!isDragging) {
+      // Subtle slow float/drift when idle
+      targetRotY += Math.sin(t * 0.45) * 0.0008;
+      targetRotX += Math.cos(t * 0.38) * 0.0006;
+    }
+
+    rotX += (targetRotX - rotX) * 0.09;
+    rotY += (targetRotY - rotY) * 0.09;
+    rotZ += (targetRotZ - rotZ) * 0.09;
+
+    const { rot, invRot } = buildRotMatrices(rotX, rotY, rotZ);
+
+    gl.uniform2f(uResolution, canvas.width, canvas.height);
+    gl.uniformMatrix3fv(uRot, false, rot);
+    gl.uniformMatrix3fv(uInvRot, false, invRot);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>

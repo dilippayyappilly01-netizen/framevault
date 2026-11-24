@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Accordion Frame Reticle Carousel</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #0e0e0e;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Full-width Horizontal Strip Container */
+    .accordion-strip {
+      position: relative;
+      width: 100vw;
+      height: 440px;
+      display: flex;
+      align-items: center;
+      justify-content: stretch;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .strip-item {
+      position: relative;
+      height: 100%;
+      flex: 1 1 0%;
+      overflow: hidden;
+      cursor: pointer;
+      transition: flex 0.55s cubic-bezier(0.22, 1, 0.36, 1), filter 0.4s ease;
+      border-right: 1px solid rgba(0, 0, 0, 0.55);
+    }
+
+    .strip-item.active {
+      flex: 0 0 440px;
+      z-index: 5;
+    }
+
+    .strip-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      pointer-events: none;
+      image-rendering: high-quality;
+      image-rendering: -webkit-optimize-contrast;
+      transform: scale(1.01) translateZ(0);
+      transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .strip-item.active img {
+      transform: scale(1) translateZ(0);
+    }
+
+    /* Sliding White Reticle Frame + Top & Bottom Crosshair Lines */
+    .reticle-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      width: 440px;
+      pointer-events: none;
+      z-index: 20;
+      will-change: transform;
+      transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .reticle-box {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 440px;
+      height: 440px;
+      transform: translateY(-50%);
+      border: 1.5px solid rgba(255, 255, 255, 0.92);
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.45);
+    }
+
+    .reticle-line-top {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 1.5px;
+      height: calc(50vh - 220px);
+      background: rgba(255, 255, 255, 0.88);
+      transform: translateX(-50%);
+    }
+
+    .reticle-line-bottom {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 1.5px;
+      height: calc(50vh - 220px);
+      background: rgba(255, 255, 255, 0.88);
+      transform: translateX(-50%);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="accordion-strip" id="strip"></div>
+
+  <!-- Sliding White Frame & Vertical Crosshair Lines -->
+  <div class="reticle-overlay" id="reticle">
+    <div class="reticle-line-top"></div>
+    <div class="reticle-box"></div>
+    <div class="reticle-line-bottom"></div>
+  </div>
+
+  <script>
+    const IMAGES = [
+      'images/1.jpg',
+      'images/2.jpg',
+      'images/3.jpg',
+      'images/4.jpg',
+      'images/5.jpg',
+      'images/6.jpg',
+      'images/7.jpg',
+      'images/8.jpg',
+      'images/9.jpg',
+      'images/10.jpg',
+      'images/11.jpg',
+      'images/12.jpg'
+    ];
+
+    const strip = document.getElementById('strip');
+    const reticle = document.getElementById('reticle');
+
+    const TOTAL = IMAGES.length;
+    let activeIndex = 4; // Start near center like the video
+    const itemEls = [];
+
+    IMAGES.forEach((src, i) => {
+      const el = document.createElement('div');
+      el.className = 'strip-item' + (i === activeIndex ? ' active' : '');
+      el.innerHTML = `<img src="${src}" alt="Portrait ${i + 1}" loading="eager" decoding="sync" fetchpriority="high">`;
+
+      el.addEventListener('pointerenter', () => {
+        setActive(i);
+      });
+      el.addEventListener('click', () => {
+        setActive(i);
+      });
+
+      strip.appendChild(el);
+      itemEls.push(el);
+    });
+
+    function computeReticlePosition(index) {
+      const vw = window.innerWidth;
+      const expandedW = Math.min(440, vw * 0.42);
+      const remainingW = vw - expandedW;
+      const sliceW = remainingW / (TOTAL - 1);
+      const leftX = index * sliceW;
+
+      reticle.style.width = `${expandedW}px`;
+      reticle.querySelector('.reticle-box').style.width = `${expandedW}px`;
+      reticle.style.transform = `translate3d(${leftX.toFixed(1)}px, 0, 0)`;
+
+      itemEls.forEach((el, idx) => {
+        if (idx === index) {
+          el.classList.add('active');
+          el.style.flex = `0 0 ${expandedW}px`;
+        } else {
+          el.classList.remove('active');
+          el.style.flex = '1 1 0%';
+        }
+      });
+    }
+
+    function setActive(index) {
+      activeIndex = ((index % TOTAL) + TOTAL) % TOTAL;
+      computeReticlePosition(activeIndex);
+    }
+
+    window.addEventListener('resize', () => computeReticlePosition(activeIndex));
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') setActive(activeIndex - 1);
+      if (e.key === 'ArrowRight') setActive(activeIndex + 1);
+    });
+
+    window.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (window._wheelLock) return;
+      window._wheelLock = true;
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (delta > 0) setActive(activeIndex + 1);
+      else if (delta < 0) setActive(activeIndex - 1);
+      setTimeout(() => { window._wheelLock = false; }, 160);
+    }, { passive: false });
+
+    // Initial position
+    computeReticlePosition(activeIndex);
+  </script>
+</body>
+</html>

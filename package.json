@@ -1,0 +1,15 @@
+{
+  "name": "originkit-component-vault",
+  "version": "1.0.0",
+  "description": "OriginKit 3D/WebGL/Canvas/DOM Component Library server with SQLite license ledger, Stripe Checkout & Webhooks, and server-side HTML compilation.",
+  "main": "server.js",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/backend.test.js",
+    "mcp:build": "npm --prefix mcp-server run build",
+    "tsx:generate": "node scripts/generate-tsx.js"
+  }
+}

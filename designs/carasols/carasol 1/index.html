@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>REEL FLUX — Archive N° 07</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #ededed;
+      color: #1a1a1a;
+      font-family: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Top Header */
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      padding: 26px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #222;
+      z-index: 50;
+      pointer-events: none;
+    }
+
+    .header-plus {
+      font-size: 15px;
+      font-weight: 400;
+      color: #444;
+    }
+
+    /* Bottom Footer */
+    footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      padding: 26px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #333;
+      z-index: 50;
+      pointer-events: none;
+    }
+
+    .footer-photos {
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: none;
+      font-size: 12px;
+      color: #222;
+    }
+
+    /* Main Interactive Stage */
+    .reel-viewport {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      perspective: 780px;
+      perspective-origin: 50% 50%;
+      cursor: grab;
+      touch-action: none;
+      overflow: hidden;
+    }
+
+    .reel-viewport:active {
+      cursor: grabbing;
+    }
+
+    /* 3D Concave Strip World */
+    .reel-strip {
+      position: relative;
+      width: 0;
+      height: 0;
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+
+    /* High-Resolution Photo Cards */
+    .reel-card {
+      position: absolute;
+      width: 520px;
+      height: 540px;
+      margin-left: -260px;
+      margin-top: -270px;
+      overflow: hidden;
+      background: #dcdcdc;
+      border-left: 1.5px solid #ededed;
+      border-right: 1.5px solid #ededed;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      will-change: transform;
+    }
+
+    .reel-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      pointer-events: none;
+      image-rendering: high-quality;
+      image-rendering: -webkit-optimize-contrast;
+      transform: translateZ(0);
+    }
+
+    /* Subtle editorial number badge on each photo */
+    .card-index {
+      position: absolute;
+      bottom: 84px;
+      right: 22px;
+      background: rgba(15, 15, 15, 0.62);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      padding: 4px 9px;
+      border-radius: 4px;
+      pointer-events: none;
+    }
+
+    /* Precision SVG Hourglass Aperture Mask & Architectural Contour Lines */
+    .aperture-svg {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 30;
+    }
+
+    /* Left & Right Circular Navigation Buttons */
+    .nav-btn {
+      position: fixed;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(237, 237, 237, 0.9);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border: 1.5px solid #222;
+      color: #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 60;
+      transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .nav-btn:hover {
+      background: #ffffff;
+      transform: translateY(-50%) scale(1.07);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+    }
+
+    .nav-btn:active {
+      transform: translateY(-50%) scale(0.95);
+    }
+
+    .nav-prev {
+      left: 24px;
+    }
+
+    .nav-next {
+      right: 24px;
+    }
+
+    .nav-btn svg {
+      width: 17px;
+      height: 17px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div>• REEL FLUX •</div>
+    <div class="header-plus">+</div>
+    <div>ARCHIVE — N° 07 &nbsp;⊕</div>
+  </header>
+
+  <!-- 3D High-Resolution Photo Ribbon -->
+  <div class="reel-viewport" id="viewport">
+    <div class="reel-strip" id="strip"></div>
+  </div>
+
+  <!-- SVG Pinched Hourglass Aperture Overlay & Guide Lines -->
+  <svg class="aperture-svg" id="apertureSvg" preserveAspectRatio="none">
+    <path id="topMaskPath" fill="#ededed"></path>
+    <path id="bottomMaskPath" fill="#ededed"></path>
+    <path id="topGuidePath" fill="none" stroke="rgba(0,0,0,0.16)" stroke-width="1.1"></path>
+    <path id="bottomGuidePath" fill="none" stroke="rgba(0,0,0,0.16)" stroke-width="1.1"></path>
+  </svg>
+
+  <!-- Navigation Buttons -->
+  <button class="nav-btn nav-prev" id="prevBtn" aria-label="Previous Photo">
+    <svg viewBox="0 0 24 24">
+      <line x1="19" y1="12" x2="5" y2="12"></line>
+      <polyline points="11 18 5 12 11 6"></polyline>
+    </svg>
+  </button>
+
+  <button class="nav-btn nav-next" id="nextBtn" aria-label="Next Photo">
+    <svg viewBox="0 0 24 24">
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+      <polyline points="13 6 19 12 13 18"></polyline>
+    </svg>
+  </button>
+
+  <!-- Bottom Footer -->
+  <footer>
+    <div>• 40.7128° N 74.0060° W</div>
+    <div class="footer-photos" id="photoCounter">/12 Photos</div>
+    <div>MOTION STUDY / SS 2026 &nbsp;⊙</div>
+  </footer>
+
+  <script>
+    const IMAGES = [
+      'images/1.jpg',
+      'images/2.jpg',
+      'images/3.jpg',
+      'images/4.jpg',
+      'images/5.jpg',
+      'images/6.jpg',
+      'images/7.jpg',
+      'images/8.jpg',
+      'images/9.jpg',
+      'images/10.jpg',
+      'images/11.jpg',
+      'images/12.jpg'
+    ];
+
+    const strip = document.getElementById('strip');
+    const viewport = document.getElementById('viewport');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+
+    const topMaskPath = document.getElementById('topMaskPath');
+    const bottomMaskPath = document.getElementById('bottomMaskPath');
+    const topGuidePath = document.getElementById('topGuidePath');
+    const bottomGuidePath = document.getElementById('bottomGuidePath');
+
+    const TOTAL = IMAGES.length;
+    const cards = [];
+
+    // Create high-resolution DOM image cards
+    IMAGES.forEach((src, i) => {
+      const el = document.createElement('div');
+      el.className = 'reel-card';
+      const num = String(i + 1).padStart(2, '0');
+      el.innerHTML = `
+        <img src="${src}" alt="Reel Photo ${num}" loading="eager" decoding="sync" fetchpriority="high">
+        <div class="card-index">N° ${num}</div>
+      `;
+      strip.appendChild(el);
+      cards.push({ el, index: i });
+    });
+
+    // Update the SVG hourglass mask paths to match the exact pinched-center / flared-edges curve
+    function updateApertureGeometry() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const cy = h * 0.5;
+
+      // Pinched half-height in center vs flared half-height at left/right edges
+      const centerHalfH = Math.min(h * 0.205, 162);
+      const edgeHalfH = Math.min(h * 0.365, 295);
+
+      const topEdgeY = cy - edgeHalfH;
+      const topCenterY = cy - centerHalfH;
+
+      const botEdgeY = cy + edgeHalfH;
+      const botCenterY = cy + centerHalfH;
+
+      // Flat middle section [0.27w .. 0.73w] with smooth cubic Bézier flares at left [0 .. 0.27w] and right [0.73w .. w]
+      const xL = w * 0.28;
+      const xR = w * 0.72;
+
+      const topCurve = `
+        M 0 ${topEdgeY}
+        C ${w * 0.08} ${topCenterY - 12}, ${w * 0.18} ${topCenterY}, ${xL} ${topCenterY}
+        L ${xR} ${topCenterY}
+        C ${w * 0.82} ${topCenterY}, ${w * 0.92} ${topCenterY - 12}, ${w} ${topEdgeY}
+      `;
+
+      const botCurve = `
+        M 0 ${botEdgeY}
+        C ${w * 0.08} ${botCenterY + 12}, ${w * 0.18} ${botCenterY}, ${xL} ${botCenterY}
+        L ${xR} ${botCenterY}
+        C ${w * 0.82} ${botCenterY}, ${w * 0.92} ${botCenterY + 12}, ${w} ${botEdgeY}
+      `;
+
+      topMaskPath.setAttribute('d', `${topCurve} L ${w} 0 L 0 0 Z`);
+      bottomMaskPath.setAttribute('d', `${botCurve} L ${w} ${h} L 0 ${h} Z`);
+
+      // Offset architectural guide lines 18px outside the aperture
+      const gOff = 18;
+      const topGuide = `
+        M 0 ${topEdgeY - gOff}
+        C ${w * 0.08} ${topCenterY - 12 - gOff}, ${w * 0.18} ${topCenterY - gOff}, ${xL} ${topCenterY - gOff}
+        L ${xR} ${topCenterY - gOff}
+        C ${w * 0.82} ${topCenterY - gOff}, ${w * 0.92} ${topCenterY - 12 - gOff}, ${w} ${topEdgeY - gOff}
+      `;
+
+      const botGuide = `
+        M 0 ${botEdgeY + gOff}
+        C ${w * 0.08} ${botCenterY + 12 + gOff}, ${w * 0.18} ${botCenterY + gOff}, ${xL} ${botCenterY + gOff}
+        L ${xR} ${botCenterY + gOff}
+        C ${w * 0.82} ${botCenterY + gOff}, ${w * 0.92} ${botCenterY + 12 + gOff}, ${w} ${botEdgeY + gOff}
+      `;
+
+      topGuidePath.setAttribute('d', topGuide);
+      bottomGuidePath.setAttribute('d', botGuide);
+    }
+
+    window.addEventListener('resize', updateApertureGeometry);
+    updateApertureGeometry();
+
+    // Scroll & 3D concave ribbon state
+    let currentIndex = 0;
+    let targetIndex = 0;
+    let isDragging = false;
+    let lastX = 0;
+    let lastTime = 0;
+    let velocity = 0;
+
+    function renderReel() {
+      if (!isDragging) {
+        currentIndex += (targetIndex - currentIndex) * 0.1;
+      } else {
+        currentIndex = targetIndex;
+      }
+
+      const cardStride = 485;
+
+      cards.forEach(({ el, index }) => {
+        // Compute circular distance in card units from center [-TOTAL/2, +TOTAL/2]
+        let delta = (index - currentIndex) % TOTAL;
+        if (delta < -TOTAL / 2) delta += TOTAL;
+        if (delta > TOTAL / 2) delta -= TOTAL;
+
+        if (Math.abs(delta) > 2.6) {
+          el.style.display = 'none';
+          return;
+        }
+        el.style.display = 'block';
+
+        // Horizontal position along the ribbon
+        const x = delta * cardStride;
+
+        // Concave 3D flare: center card sits flat at z = 0, side cards curve forward in Z and angle inward
+        const norm = delta / 1.65;
+        const z = Math.min(220, Math.pow(Math.abs(norm), 1.85) * 155);
+        const rotY = Math.max(-28, Math.min(28, -norm * 19));
+
+        el.style.transform = `translate3d(${x.toFixed(2)}px, 0, ${z.toFixed(2)}px) rotateY(${rotY.toFixed(2)}deg)`;
+        el.style.zIndex = Math.round(100 - Math.abs(delta) * 10);
+      });
+
+      requestAnimationFrame(renderReel);
+    }
+
+    // Pointer Drag Interaction
+    viewport.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      lastX = e.clientX;
+      lastTime = performance.now();
+      velocity = 0;
+      viewport.setPointerCapture(e.pointerId);
+    });
+
+    viewport.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const now = performance.now();
+      const dx = e.clientX - lastX;
+      const dt = Math.max(1, now - lastTime);
+
+      const dIdx = -dx / 460;
+      targetIndex += dIdx;
+      velocity = dIdx / dt;
+
+      lastX = e.clientX;
+      lastTime = now;
+    });
+
+    function endDrag() {
+      if (!isDragging) return;
+      isDragging = false;
+      targetIndex += velocity * 180;
+      targetIndex = Math.round(targetIndex);
+    }
+
+    viewport.addEventListener('pointerup', endDrag);
+    viewport.addEventListener('pointercancel', endDrag);
+
+    // Prev / Next Arrow Buttons
+    prevBtn.addEventListener('click', () => {
+      targetIndex = Math.round(targetIndex) - 1;
+    });
+
+    nextBtn.addEventListener('click', () => {
+      targetIndex = Math.round(targetIndex) + 1;
+    });
+
+    // Wheel & Keyboard Support
+    window.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      targetIndex += delta * 0.0022;
+      clearTimeout(window._reelSnap);
+      window._reelSnap = setTimeout(() => {
+        targetIndex = Math.round(targetIndex);
+      }, 220);
+    }, { passive: false });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') targetIndex = Math.round(targetIndex) - 1;
+      if (e.key === 'ArrowRight') targetIndex = Math.round(targetIndex) + 1;
+    });
+
+    requestAnimationFrame(renderReel);
+  </script>
+</body>
+</html>

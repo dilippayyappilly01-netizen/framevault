@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Stack Carousel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #ededed;
+      color: #111;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .carousel-wrapper {
+      position: relative;
+      width: 100vw;
+      height: 460px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      perspective: 1100px;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .carousel-wrapper:active {
+      cursor: grabbing;
+    }
+
+    .stack-stage {
+      position: relative;
+      width: 0;
+      height: 0;
+      transform-style: preserve-3d;
+    }
+
+    .stack-card {
+      position: absolute;
+      width: 280px;
+      height: 380px;
+      margin-left: -140px;
+      margin-top: -190px;
+      border-radius: 38px;
+      overflow: hidden;
+      background: #d8d8d8;
+      box-shadow: 0 22px 48px rgba(0, 0, 0, 0.14), 0 3px 10px rgba(0, 0, 0, 0.05);
+      will-change: transform, opacity;
+      cursor: pointer;
+    }
+
+    .stack-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      pointer-events: none;
+      image-rendering: -webkit-optimize-contrast;
+      transform: translateZ(0);
+    }
+
+    /* Subtle frosted glass caption overlay on cards matching the recording aesthetic */
+    .card-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 28px 24px;
+      text-align: center;
+      color: #fff;
+      background: linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.48) 100%);
+      pointer-events: none;
+    }
+
+    .card-sparkle {
+      font-size: 13px;
+      opacity: 0.85;
+    }
+
+    .card-caption {
+      font-size: 11px;
+      line-height: 1.45;
+      color: rgba(255, 255, 255, 0.9);
+      max-width: 210px;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+    }
+
+    /* Compact Pill Indicator directly below center card */
+    .pill-indicator {
+      margin-top: 8px;
+      height: 20px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: #848484;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      z-index: 40;
+      cursor: pointer;
+    }
+
+    .dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.55);
+      transition: width 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.25s ease;
+    }
+
+    .dot.active {
+      width: 11px;
+      background: #ffffff;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="carousel-wrapper" id="wrapper">
+    <div class="stack-stage" id="stage"></div>
+  </div>
+
+  <div class="pill-indicator" id="pillIndicator" title="Click to advance"></div>
+
+  <script>
+    const CARDS = [
+      { src: 'images/1.jpg', caption: 'Golden hour silhouette framed against calm coastal horizons.' },
+      { src: 'images/2.jpg', caption: 'Starlit nocturnal reflections across still wilderness waters.' },
+      { src: 'images/3.jpg', caption: 'Celestial Milky Way arch above ancient savanna plains.' },
+      { src: 'images/4.jpg', caption: 'Quiet rainforest bond captured in warm natural light.' },
+      { src: 'images/5.jpg', caption: 'Deep ocean sunbeams illuminating weightless marine motion.' },
+      { src: 'images/6.jpg', caption: 'Perspective framed in flight above open coastal cliffs.' },
+      { src: 'images/7.jpg', caption: 'Pastel dusk clouds mirrored along a quiet wooden pier.' },
+      { src: 'images/8.jpg', caption: 'Emerald canopy avenue leading to a solitary park bench.' },
+      { src: 'images/9.jpg', caption: 'Amber supermoon rising behind craggy mountain pines.' },
+      { src: 'images/10.jpg', caption: 'Crimson blossom tree reflected in glassy morning water.' },
+      { src: 'images/11.jpg', caption: 'Autumn leaves drifting across a sunlit cobblestone path.' },
+      { src: 'images/12.jpg', caption: 'Expressive wildlife portrait in vibrant woodland bokeh.' }
+    ];
+
+    const stage = document.getElementById('stage');
+    const wrapper = document.getElementById('wrapper');
+    const pillIndicator = document.getElementById('pillIndicator');
+
+    const TOTAL = CARDS.length;
+    const cardEls = [];
+    const dotEls = [];
+
+    CARDS.forEach((item, i) => {
+      const el = document.createElement('div');
+      el.className = 'stack-card';
+      el.innerHTML = `
+        <img src="${item.src}" alt="Slide ${i + 1}" loading="eager" decoding="sync" fetchpriority="high">
+        <div class="card-overlay">
+          <div class="card-sparkle">✦</div>
+          <div class="card-caption">${item.caption}</div>
+        </div>
+      `;
+      el.addEventListener('click', () => {
+        if (!wasDragged) {
+          // Shortest circular step to clicked card
+          let diff = (i - Math.round(targetIndex)) % TOTAL;
+          if (diff > TOTAL / 2) diff -= TOTAL;
+          if (diff < -TOTAL / 2) diff += TOTAL;
+          targetIndex = Math.round(targetIndex) + diff;
+        }
+      });
+      stage.appendChild(el);
+      cardEls.push({ el, index: i });
+    });
+
+    // 3 indicator dots in the compact pill matching the video
+    for (let d = 0; d < 3; d++) {
+      const dot = document.createElement('div');
+      dot.className = 'dot' + (d === 0 ? ' active' : '');
+      pillIndicator.appendChild(dot);
+      dotEls.push(dot);
+    }
+
+    pillIndicator.addEventListener('click', () => {
+      targetIndex = Math.round(targetIndex) + 1;
+    });
+
+    let currentIndex = 0;
+    let targetIndex = 0;
+    let isDragging = false;
+    let wasDragged = false;
+    let startX = 0;
+    let lastX = 0;
+    let lastTime = 0;
+    let velocity = 0;
+
+    // Auto-advance timer like in the video recording
+    let autoTimer = setInterval(() => {
+      if (!isDragging) {
+        targetIndex = Math.round(targetIndex) + 1;
+      }
+    }, 2800);
+
+    function resetAutoTimer() {
+      clearInterval(autoTimer);
+      autoTimer = setInterval(() => {
+        if (!isDragging) {
+          targetIndex = Math.round(targetIndex) + 1;
+        }
+      }, 2800);
+    }
+
+    function renderStack() {
+      if (!isDragging) {
+        currentIndex += (targetIndex - currentIndex) * 0.12;
+      } else {
+        currentIndex = targetIndex;
+      }
+
+      cardEls.forEach(({ el, index }) => {
+        let delta = (index - currentIndex) % TOTAL;
+        if (delta < -TOTAL / 2) delta += TOTAL;
+        if (delta > TOTAL / 2) delta -= TOTAL;
+
+        const absDelta = Math.abs(delta);
+
+        // Only 3 cards visible at a time (center + immediate left & right neighbors)
+        if (absDelta > 1.65) {
+          el.style.opacity = '0';
+          el.style.pointerEvents = 'none';
+          return;
+        }
+
+        // Exact 3-card geometry from video:
+        // Center card: x = 0, scale = 1, z = 0
+        // Side cards (delta = ±1): x = ±168px, scale = 0.72, z = -120px
+        const x = delta * 168;
+        const z = -absDelta * 120;
+        const scale = Math.max(0.55, 1 - absDelta * 0.28);
+        const opacity = absDelta > 1 ? Math.max(0, 1 - (absDelta - 1) * 1.8) : 1;
+
+        el.style.opacity = opacity.toFixed(3);
+        el.style.pointerEvents = opacity > 0.3 ? 'auto' : 'none';
+        el.style.transform = `translate3d(${x.toFixed(2)}px, 0, ${z.toFixed(2)}px) scale(${scale.toFixed(4)})`;
+        el.style.zIndex = Math.round(100 - absDelta * 30);
+      });
+
+      // Update active pill dot (cycles 0, 1, 2)
+      const activeMod = ((Math.round(currentIndex) % 3) + 3) % 3;
+      dotEls.forEach((d, idx) => {
+        d.classList.toggle('active', idx === activeMod);
+      });
+
+      requestAnimationFrame(renderStack);
+    }
+
+    wrapper.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      wasDragged = false;
+      startX = e.clientX;
+      lastX = e.clientX;
+      lastTime = performance.now();
+      velocity = 0;
+      resetAutoTimer();
+      wrapper.setPointerCapture(e.pointerId);
+    });
+
+    wrapper.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      if (Math.abs(e.clientX - startX) > 5) wasDragged = true;
+
+      const now = performance.now();
+      const dx = e.clientX - lastX;
+      const dt = Math.max(1, now - lastTime);
+
+      targetIndex -= dx / 220;
+      velocity = -dx / dt;
+
+      lastX = e.clientX;
+      lastTime = now;
+    });
+
+    function endDrag() {
+      if (!isDragging) return;
+      isDragging = false;
+      targetIndex += velocity * 0.35;
+      targetIndex = Math.round(targetIndex);
+      resetAutoTimer();
+    }
+
+    wrapper.addEventListener('pointerup', endDrag);
+    wrapper.addEventListener('pointercancel', endDrag);
+
+    window.addEventListener('keydown', (e) => {
+      resetAutoTimer();
+      if (e.key === 'ArrowLeft') targetIndex = Math.round(targetIndex) - 1;
+      if (e.key === 'ArrowRight') targetIndex = Math.round(targetIndex) + 1;
+    });
+
+    requestAnimationFrame(renderStack);
+  </script>
+</body>
+</html>

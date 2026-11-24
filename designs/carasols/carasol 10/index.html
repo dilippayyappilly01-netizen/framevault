@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Cylindrical Drum Carousel</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #ededed;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .viewport {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      perspective: 1200px;
+      perspective-origin: 50% 42%;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .viewport:active {
+      cursor: grabbing;
+    }
+
+    .drum-ring {
+      position: relative;
+      width: 0;
+      height: 0;
+      transform-style: preserve-3d;
+      transform: rotateX(-5deg);
+      will-change: transform;
+    }
+
+    .drum-card {
+      position: absolute;
+      width: 240px;
+      height: 240px;
+      margin-left: -120px;
+      margin-top: -120px;
+      border-radius: 22px;
+      overflow: hidden;
+      background: #dcdcdc;
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.14);
+      transform-style: preserve-3d;
+      will-change: transform, filter;
+    }
+
+    .drum-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      pointer-events: none;
+      image-rendering: -webkit-optimize-contrast;
+      transform: translateZ(0);
+    }
+
+    /* Signature vertical fluted/ribbed glass line overlay seen in Carousel 10 */
+    .drum-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.08) 0px,
+        rgba(255, 255, 255, 0.08) 1px,
+        rgba(0, 0, 0, 0.14) 1px,
+        rgba(0, 0, 0, 0.14) 2px,
+        transparent 2px,
+        transparent 7px
+      );
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="viewport" id="viewport">
+    <div class="drum-ring" id="drum"></div>
+  </div>
+
+  <script>
+    const IMAGES = [
+      'images/1.jpg',
+      'images/2.jpg',
+      'images/3.jpg',
+      'images/4.jpg',
+      'images/5.jpg',
+      'images/6.jpg',
+      'images/7.jpg',
+      'images/8.jpg',
+      'images/9.jpg',
+      'images/10.jpg',
+      'images/11.jpg',
+      'images/12.jpg'
+    ];
+
+    const drum = document.getElementById('drum');
+    const viewport = document.getElementById('viewport');
+
+    const TOTAL = IMAGES.length; // 12 cards around the drum
+    const STEP_RAD = (Math.PI * 2) / TOTAL;
+    // Radius chosen so 12 cards of width 240px sit edge-to-edge in a tight cylinder
+    const RADIUS = 458;
+    const cards = [];
+
+    IMAGES.forEach((src, i) => {
+      const el = document.createElement('div');
+      el.className = 'drum-card';
+      el.innerHTML = `<img src="${src}" alt="Drum Slide ${i + 1}" loading="eager" decoding="sync" fetchpriority="high">`;
+      drum.appendChild(el);
+      cards.push({ el, index: i });
+    });
+
+    let currentAngle = 0;
+    let targetAngle = 0;
+    let isDragging = false;
+    let lastX = 0;
+    let lastTime = 0;
+    let velocity = 0;
+    let autoSpin = true;
+
+    function renderDrum() {
+      if (autoSpin && !isDragging) {
+        targetAngle -= 0.0032;
+      }
+
+      if (!isDragging) {
+        currentAngle += (targetAngle - currentAngle) * 0.11;
+      } else {
+        currentAngle = targetAngle;
+      }
+
+      cards.forEach(({ el, index }) => {
+        const theta = index * STEP_RAD + currentAngle;
+        const x = RADIUS * Math.sin(theta);
+        const z = RADIUS * Math.cos(theta);
+        const rotY = (theta * 180) / Math.PI;
+
+        // Back cards are slightly dimmed so the front arc reads clearly
+        const depthNorm = (Math.cos(theta) + 1) * 0.5; // 0 at back, 1 at front
+        const brightness = 0.72 + 0.28 * depthNorm;
+
+        el.style.transform = `translate3d(${x.toFixed(2)}px, 0, ${z.toFixed(2)}px) rotateY(${rotY.toFixed(2)}deg)`;
+        el.style.filter = `brightness(${brightness.toFixed(2)})`;
+        el.style.zIndex = Math.round(z + 1000);
+      });
+
+      requestAnimationFrame(renderDrum);
+    }
+
+    viewport.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      autoSpin = false;
+      lastX = e.clientX;
+      lastTime = performance.now();
+      velocity = 0;
+      viewport.setPointerCapture(e.pointerId);
+    });
+
+    viewport.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const now = performance.now();
+      const dx = e.clientX - lastX;
+      const dt = Math.max(1, now - lastTime);
+
+      const dAngle = dx * 0.0038;
+      targetAngle += dAngle;
+      velocity = dAngle / dt;
+
+      lastX = e.clientX;
+      lastTime = now;
+    });
+
+    function endDrag() {
+      if (!isDragging) return;
+      isDragging = false;
+      targetAngle += velocity * 160;
+      setTimeout(() => {
+        if (!isDragging) autoSpin = true;
+      }, 1800);
+    }
+
+    viewport.addEventListener('pointerup', endDrag);
+    viewport.addEventListener('pointercancel', endDrag);
+
+    window.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      autoSpin = false;
+      targetAngle += (e.deltaX || e.deltaY) * 0.0022;
+      clearTimeout(window._drumTimer);
+      window._drumTimer = setTimeout(() => { autoSpin = true; }, 1800);
+    }, { passive: false });
+
+    window.addEventListener('keydown', (e) => {
+      autoSpin = false;
+      if (e.key === 'ArrowLeft') targetAngle += STEP_RAD;
+      if (e.key === 'ArrowRight') targetAngle -= STEP_RAD;
+    });
+
+    requestAnimationFrame(renderDrum);
+  </script>
+</body>
+</html>

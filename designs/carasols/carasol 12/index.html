@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Perspective Louver Carousel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #ededed;
+      color: #111;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .viewport {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      perspective: 1100px;
+      perspective-origin: 50% 50%;
+      cursor: grab;
+      touch-action: none;
+      overflow: hidden;
+    }
+
+    .viewport:active {
+      cursor: grabbing;
+    }
+
+    .gallery-track {
+      position: relative;
+      width: 0;
+      height: 0;
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+
+    .louver-card {
+      position: absolute;
+      width: 220px;
+      height: 280px;
+      margin-left: -110px;
+      margin-top: -140px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #d8d8d8;
+      box-shadow: 0 18px 38px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.06);
+      transform-style: preserve-3d;
+      will-change: transform, opacity;
+      cursor: pointer;
+    }
+
+    .louver-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      pointer-events: none;
+      image-rendering: -webkit-optimize-contrast;
+      transform: translateZ(0);
+    }
+
+    /* Bottom-left subtle dark gradient & white label matching Carousel 12 */
+    .louver-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent 55%, rgba(0, 0, 0, 0.62) 100%);
+      pointer-events: none;
+    }
+
+    .card-title {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      z-index: 2;
+      pointer-events: none;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="viewport" id="viewport">
+    <div class="gallery-track" id="track"></div>
+  </div>
+
+  <script>
+    const SLIDES = [
+      { src: 'images/1.jpg', title: 'Rising Curve' },
+      { src: 'images/2.jpg', title: 'Flight Deck' },
+      { src: 'images/3.jpg', title: 'Glass Visor' },
+      { src: 'images/4.jpg', title: 'Vertical City' },
+      { src: 'images/5.jpg', title: 'Looking Up' },
+      { src: 'images/6.jpg', title: 'Soft Concrete' },
+      { src: 'images/7.jpg', title: 'Bronze Guard' },
+      { src: 'images/8.jpg', title: 'Glass Model' },
+      { src: 'images/9.jpg', title: 'Spiral' },
+      { src: 'images/10.jpg', title: 'Crimson Lake' },
+      { src: 'images/11.jpg', title: 'Autumn Path' },
+      { src: 'images/12.jpg', title: 'Canopy Light' }
+    ];
+
+    const track = document.getElementById('track');
+    const viewport = document.getElementById('viewport');
+
+    const TOTAL = SLIDES.length;
+    const cards = [];
+
+    SLIDES.forEach((slide, i) => {
+      const el = document.createElement('div');
+      el.className = 'louver-card';
+      el.innerHTML = `
+        <img src="${slide.src}" alt="${slide.title}" loading="eager" decoding="sync" fetchpriority="high">
+        <div class="card-title">${slide.title}</div>
+      `;
+      el.addEventListener('click', () => {
+        if (!wasDragged) {
+          let diff = (i - Math.round(targetIndex)) % TOTAL;
+          if (diff > TOTAL / 2) diff -= TOTAL;
+          if (diff < -TOTAL / 2) diff += TOTAL;
+          targetIndex = Math.round(targetIndex) + diff;
+        }
+      });
+      track.appendChild(el);
+      cards.push({ el, index: i });
+    });
+
+    let currentIndex = 0;
+    let targetIndex = 0;
+    let isDragging = false;
+    let wasDragged = false;
+    let startX = 0;
+    let lastX = 0;
+    let lastTime = 0;
+    let velocity = 0;
+
+    const SPACING = 215;
+
+    function renderLouverGallery() {
+      if (!isDragging) {
+        currentIndex += (targetIndex - currentIndex) * 0.11;
+      } else {
+        currentIndex = targetIndex;
+      }
+
+      cards.forEach(({ el, index }) => {
+        // Compute shortest circular index offset from active center card
+        let delta = (index - currentIndex) % TOTAL;
+        if (delta < -TOTAL / 2) delta += TOTAL;
+        if (delta > TOTAL / 2) delta -= TOTAL;
+
+        const absDelta = Math.abs(delta);
+        if (absDelta > 4.2) {
+          el.style.opacity = '0';
+          el.style.pointerEvents = 'none';
+          return;
+        }
+
+        const x = delta * SPACING;
+        // Center card (delta = 0) faces flat forward (rotY = 0).
+        // Cards off-center smoothly turn into 3D louver perspective matching the video!
+        const t = Math.max(-1, Math.min(1, delta / 0.85));
+        const rotY = t * -56;
+        const z = -Math.min(1, absDelta) * 55;
+
+        el.style.opacity = '1';
+        el.style.pointerEvents = 'auto';
+        el.style.transform = `translate3d(${x.toFixed(2)}px, 0, ${z.toFixed(2)}px) rotateY(${rotY.toFixed(2)}deg)`;
+        el.style.zIndex = Math.round(100 - absDelta * 10);
+      });
+
+      requestAnimationFrame(renderLouverGallery);
+    }
+
+    viewport.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      wasDragged = false;
+      startX = e.clientX;
+      lastX = e.clientX;
+      lastTime = performance.now();
+      velocity = 0;
+      viewport.setPointerCapture(e.pointerId);
+    });
+
+    viewport.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      if (Math.abs(e.clientX - startX) > 5) wasDragged = true;
+
+      const now = performance.now();
+      const dx = e.clientX - lastX;
+      const dt = Math.max(1, now - lastTime);
+
+      targetIndex -= dx / SPACING;
+      velocity = -dx / dt;
+
+      lastX = e.clientX;
+      lastTime = now;
+    });
+
+    function endDrag() {
+      if (!isDragging) return;
+      isDragging = false;
+      targetIndex += velocity * 0.35;
+      targetIndex = Math.round(targetIndex);
+    }
+
+    viewport.addEventListener('pointerup', endDrag);
+    viewport.addEventListener('pointercancel', endDrag);
+
+    window.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      targetIndex += (e.deltaX || e.deltaY) * 0.003;
+      clearTimeout(window._louverSnap);
+      window._louverSnap = setTimeout(() => {
+        targetIndex = Math.round(targetIndex);
+      }, 250);
+    }, { passive: false });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') targetIndex = Math.round(targetIndex) - 1;
+      if (e.key === 'ArrowRight') targetIndex = Math.round(targetIndex) + 1;
+    });
+
+    requestAnimationFrame(renderLouverGallery);
+  </script>
+</body>
+</html>

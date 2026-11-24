@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orb 01 — Bioluminescent Cyan Plasma Containment Sphere</title>
+<style>
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000000;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    cursor: grab;
+  }
+
+  canvas:active {
+    cursor: grabbing;
+  }
+</style>
+</head>
+<body>
+<canvas id="glCanvas"></canvas>
+
+<script>
+(() => {
+  const canvas = document.getElementById('glCanvas');
+  const gl = canvas.getContext('webgl2', { antialias: true }) ||
+             canvas.getContext('webgl', { antialias: true });
+  if (!gl) return;
+
+  const vsSource = `
+    attribute vec2 aPos;
+    varying vec2 vUv;
+    void main() {
+      vUv = aPos;
+      gl_Position = vec4(aPos, 0.0, 1.0);
+    }
+  `;
+
+  // Volumetric 3D Plasma Tendril & Glass Containment Sphere Shader
+  // Replicating the exact cyan plasma filaments, glowing white-cyan core, concentric hair-thin
+  // orbital rings, suspended spark particles, and top-left lit glass Fresnel rim of Orb 1
+  const fsSource = `
+    precision highp float;
+    varying vec2 vUv;
+
+    uniform vec2 uResolution;
+    uniform float uTime;
+    uniform mat3 uRot;
+
+    // Fast 3D hash & gradient noise for volumetric plasma filaments
+    float hash(vec3 p) {
+      p = fract(p * vec3(443.897, 441.423, 437.195));
+      p += dot(p, p.yzx + 19.19);
+      return fract((p.x + p.y) * p.z);
+    }
+
+    float noise(vec3 p) {
+      vec3 i = floor(p);
+      vec3 f = fract(p);
+      f = f * f * (3.0 - 2.0 * f);
+
+      return mix(
+        mix(
+          mix(hash(i + vec3(0,0,0)), hash(i + vec3(1,0,0)), f.x),
+          mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x),
+          f.y
+        ),
+        mix(
+          mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+          mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x),
+          f.y
+        ),
+        f.z
+      );
+    }
+
+    // Ridge/filament turbulence that produces sharp electric plasma ribbons & tendrils
+    float filamentField(vec3 p, float t) {
+      vec3 q = p;
+      // Domain warp with slow 3D curl-like flow
+      vec3 warp = vec3(
+        noise(q * 2.4 + vec3(t * 0.35, -t * 0.25, 0.0)),
+        noise(q * 2.4 + vec3(0.0, t * 0.30, -t * 0.28)),
+        noise(q * 2.4 + vec3(-t * 0.22, 0.0, t * 0.32))
+      ) - 0.5;
+      q += warp * 0.52;
+
+      float n1 = abs(noise(q * 3.8 + t * 0.25) - 0.5);
+      float n2 = abs(noise(q * 7.6 - t * 0.35 + warp * 1.4) - 0.5);
+      float n3 = abs(noise(q * 15.2 + t * 0.45) - 0.5);
+
+      // Sharp ridge inversion for glowing plasma strands
+      float r1 = smoothstep(0.14, 0.0, n1);
+      float r2 = smoothstep(0.11, 0.0, n2);
+      float r3 = smoothstep(0.08, 0.0, n3);
+
+      return r1 * r2 * 2.4 + r1 * 0.35 + r2 * r3 * 1.35;
+    }
+
+    // 3D suspended spark particles inside the plasma orb
+    float sparkField(vec3 p, float t) {
+      vec3 q = p * 14.0 + vec3(sin(t * 0.2), cos(t * 0.17), sin(t * 0.13));
+      vec3 cell = floor(q);
+      vec3 fracP = fract(q) - 0.5;
+      float h = hash(cell);
+      if (h < 0.84) return 0.0;
+      vec3 jitter = (vec3(hash(cell + 1.1), hash(cell + 2.3), hash(cell + 3.7)) - 0.5) * 0.55;
+      float d = length(fracP - jitter);
+      float twinkle = 0.5 + 0.5 * sin(t * 3.5 + h * 40.0);
+      return smoothstep(0.11, 0.01, d) * twinkle * 1.4;
+    }
+
+    void main() {
+      vec2 uv = vUv;
+      uv.x *= uResolution.x / max(uResolution.y, 1.0);
+
+      // Sphere radius in normalized screen units (matching size in recording)
+      float R = 0.73;
+      float r2d = length(uv);
+
+      // Outer atmospheric halo around the glass containment orb
+      vec3 col = vec3(0.0);
+      float topLeftBias = 0.65 + 0.35 * dot(normalize(uv + vec2(1e-5)), normalize(vec2(-0.65, 0.76)));
+      float outerHalo = exp(-max(0.0, r2d - R) * 14.0) * smoothstep(R + 0.22, R - 0.02, r2d);
+      col += vec3(0.18, 0.55, 0.78) * outerHalo * 0.18 * topLeftBias;
+
+      if (r2d > R + 0.004) {
+        gl_FragColor = vec4(col, 1.0);
+        return;
+      }
+
+      // Normalized coordinates on unit sphere
+      vec2 p2 = uv / R;
+      float rNorm = length(p2);
+      float zSurf = sqrt(max(0.0, 1.0 - rNorm * rNorm));
+      vec3 nSurf = vec3(p2, zSurf);
+
+      // Raymarch through the interior of the unit sphere from front (+zSurf) to back (-zSurf)
+      const int STEPS = 28;
+      float totalLen = 2.0 * zSurf;
+      float stepSize = totalLen / float(STEPS);
+
+      vec3 accumPlasma = vec3(0.0);
+      float t = uTime;
+
+      for (int i = 0; i < STEPS; i++) {
+        float fi = (float(i) + 0.5) / float(STEPS);
+        float z = zSurf - fi * totalLen;
+        vec3 pos = vec3(p2.x, p2.y, z);
+        float rad = length(pos);
+
+        // Rotate internal 3D plasma structure
+        vec3 rp = uRot * pos;
+
+        // Shell envelope: plasma tendrils are concentrated between rad=0.12 and rad=0.76
+        float innerShell = smoothstep(0.82, 0.42, rad) * smoothstep(0.04, 0.24, rad);
+        float coreCluster = exp(-rad * rad * 18.0);
+
+        float fil = filamentField(rp, t);
+
+        // Delicate concentric orbital rings visible in mid-shell (rad ~ 0.45..0.72)
+        float latRing1 = exp(-pow((length(rp.xy) - 0.54) * 28.0, 2.0)) * exp(-abs(rp.z) * 10.0);
+        float latRing2 = exp(-pow((length(rp.yz) - 0.46) * 32.0, 2.0)) * exp(-abs(rp.x) * 10.0);
+        float latRing3 = exp(-pow((length(rp.xz) - 0.62) * 30.0, 2.0)) * exp(-abs(rp.y) * 10.0);
+        float orbitalRings = (latRing1 + latRing2 + latRing3) * 0.55;
+
+        // Suspended micro-sparks
+        float sparks = sparkField(rp, t) * smoothstep(0.84, 0.25, rad);
+
+        // Color temperature gradient: pure white-cyan at core -> electric cyan -> deep cerulean outer
+        vec3 deepCyan   = vec3(0.08, 0.48, 0.78);
+        vec3 brightCyan = vec3(0.32, 0.85, 1.00);
+        vec3 coreWhite  = vec3(0.88, 0.98, 1.00);
+
+        float intensity = fil * innerShell * (1.0 + coreCluster * 2.2) + orbitalRings;
+        vec3 sampleCol = mix(deepCyan, brightCyan, clamp(fil * 0.65 + coreCluster, 0.0, 1.0));
+        sampleCol = mix(sampleCol, coreWhite, clamp(coreCluster * 1.2 + pow(fil, 2.4) * 0.35, 0.0, 1.0));
+
+        accumPlasma += (sampleCol * intensity + coreWhite * sparks) * stepSize;
+      }
+
+      // Central intense glowing plasma core bloom
+      float coreDist = rNorm;
+      float coreBloom1 = exp(-coreDist * coreDist * 28.0) * 1.15;
+      float coreBloom2 = exp(-coreDist * coreDist * 6.5) * 0.48;
+      float coreBloom3 = exp(-coreDist * coreDist * 2.2) * 0.18;
+
+      vec3 interior = accumPlasma * 1.32;
+      interior += vec3(0.92, 0.99, 1.00) * coreBloom1;
+      interior += vec3(0.28, 0.80, 0.98) * coreBloom2;
+      interior += vec3(0.10, 0.45, 0.68) * coreBloom3;
+
+      // Glass containment sphere shading & Fresnel rim
+      // In the video, the glass sphere has a crisp illuminated rim strongest at top-left (-0.62, 0.74)
+      float fresnel = pow(1.0 - zSurf, 2.65);
+      float rimEdge = pow(1.0 - zSurf, 7.5);
+      vec2 light2D = normalize(vec2(-0.62, 0.74));
+      float dirRim = 0.42 + 0.58 * clamp(dot(normalize(p2 + vec2(1e-5)), light2D) * 0.5 + 0.5, 0.0, 1.0);
+
+      // Top-left specular catchlight along the glass curvature
+      vec3 keyLight = normalize(vec3(-0.55, 0.65, 0.52));
+      vec3 refl = reflect(vec3(0.0, 0.0, -1.0), nSurf);
+      float glassSpec = pow(max(0.0, dot(refl, keyLight)), 28.0) * fresnel;
+
+      vec3 glassRimCol = mix(vec3(0.18, 0.56, 0.78), vec3(0.78, 0.95, 1.0), rimEdge);
+      vec3 sphereCol = interior;
+      sphereCol += glassRimCol * fresnel * dirRim * 0.88;
+      sphereCol += vec3(0.85, 0.97, 1.0) * rimEdge * dirRim * 0.52;
+      sphereCol += vec3(0.90, 0.98, 1.0) * glassSpec * 0.65;
+
+      // Anti-aliased circular boundary
+      float edgeAA = 1.0 - smoothstep(R - 0.003, R + 0.002, r2d);
+      col = mix(col, sphereCol, edgeAA);
+
+      // Smooth tone mapping so the bright white core and cyan filaments retain full detail
+      col = 1.0 - exp(-col * 1.15);
+
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `;
+
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, vsSource));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fsSource));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+
+  const quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+    gl.STATIC_DRAW
+  );
+
+  const aPos = gl.getAttribLocation(prog, 'aPos');
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  const uResolution = gl.getUniformLocation(prog, 'uResolution');
+  const uTime = gl.getUniformLocation(prog, 'uTime');
+  const uRot = gl.getUniformLocation(prog, 'uRot');
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(window.innerWidth * dpr);
+    canvas.height = Math.round(window.innerHeight * dpr);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  let rotX = 0.2;
+  let rotY = 0.0;
+  let targetRotX = 0.2;
+  let targetRotY = 0.0;
+  let isDragging = false;
+  let lastX = 0;
+  let lastY = 0;
+
+  window.addEventListener('pointerdown', (e) => {
+    isDragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    targetRotY += dx * 0.007;
+    targetRotX = Math.max(-1.3, Math.min(1.3, targetRotX + dy * 0.007));
+  });
+
+  window.addEventListener('pointerup', () => {
+    isDragging = false;
+  });
+
+  function buildRot(rx, ry) {
+    const cx = Math.cos(rx), sx = Math.sin(rx);
+    const cy = Math.cos(ry), sy = Math.sin(ry);
+    return new Float32Array([
+      cy, sx * sy, -cx * sy,
+      0,  cx,       sx,
+      sy, -sx * cy, cx * cy
+    ]);
+  }
+
+  function render(now) {
+    const t = now * 0.001;
+    if (!isDragging) {
+      targetRotY += 0.0022;
+    }
+    rotX += (targetRotX - rotX) * 0.08;
+    rotY += (targetRotY - rotY) * 0.08;
+
+    gl.uniform2f(uResolution, canvas.width, canvas.height);
+    gl.uniform1f(uTime, t);
+    gl.uniformMatrix3fv(uRot, false, buildRot(rotX, rotY));
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>

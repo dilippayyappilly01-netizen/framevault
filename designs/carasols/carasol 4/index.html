@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Rolodex Fin Carousel</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #ededed;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .viewport {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      perspective: 1300px;
+      perspective-origin: 50% 50%;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .viewport:active {
+      cursor: grabbing;
+    }
+
+    /* Isometric 3/4 view matching the video recording */
+    .rolodex-assembly {
+      position: relative;
+      width: 0;
+      height: 0;
+      transform-style: preserve-3d;
+      transform: rotateX(-12deg) rotateY(-34deg) rotateZ(-6deg);
+      will-change: transform;
+    }
+
+    /* Each fin is hinged at its bottom edge along the central horizontal spine */
+    .fin {
+      position: absolute;
+      width: 280px;
+      height: 250px;
+      left: -140px;
+      top: -250px;
+      transform-origin: 50% 100%;
+      transform-style: preserve-3d;
+      will-change: transform, filter;
+    }
+
+    .fin-face {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 10px 10px 3px 3px;
+      overflow: hidden;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      background: #d8d8d8;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+    }
+
+    .fin-face.back {
+      transform: rotateY(180deg) rotateZ(180deg);
+    }
+
+    .fin-face img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      pointer-events: none;
+      image-rendering: -webkit-optimize-contrast;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="viewport" id="viewport">
+    <div class="rolodex-assembly" id="assembly"></div>
+  </div>
+
+  <script>
+    const IMAGES = [
+      'images/1.jpg',
+      'images/2.jpg',
+      'images/3.jpg',
+      'images/4.jpg',
+      'images/5.jpg',
+      'images/6.jpg',
+      'images/7.jpg',
+      'images/8.jpg',
+      'images/9.jpg',
+      'images/10.jpg',
+      'images/11.jpg',
+      'images/12.jpg'
+    ];
+
+    const assembly = document.getElementById('assembly');
+    const viewport = document.getElementById('viewport');
+
+    // 6 full radiating fins (12 faces total, displaying all 12 high-res user pictures!)
+    const FIN_COUNT = 6;
+    const STEP_DEG = 360 / FIN_COUNT;
+    const fins = [];
+
+    for (let i = 0; i < FIN_COUNT; i++) {
+      const fin = document.createElement('div');
+      fin.className = 'fin';
+
+      const frontImg = IMAGES[(i * 2) % IMAGES.length];
+      const backImg = IMAGES[(i * 2 + 1) % IMAGES.length];
+
+      fin.innerHTML = `
+        <div class="fin-face front">
+          <img src="${frontImg}" alt="Slide ${i * 2 + 1}" loading="eager" decoding="sync" fetchpriority="high">
+        </div>
+        <div class="fin-face back">
+          <img src="${backImg}" alt="Slide ${i * 2 + 2}" loading="eager" decoding="sync" fetchpriority="high">
+        </div>
+      `;
+
+      assembly.appendChild(fin);
+      fins.push({ el: fin, baseAngle: i * STEP_DEG });
+    }
+
+    let currentAngle = 18;
+    let targetAngle = 18;
+    let isDragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    let lastTime = 0;
+    let velocity = 0;
+    let autoSpin = true;
+
+    function renderRolodex() {
+      if (autoSpin && !isDragging) {
+        targetAngle += 0.28;
+      }
+
+      if (!isDragging) {
+        currentAngle += (targetAngle - currentAngle) * 0.11;
+      } else {
+        currentAngle = targetAngle;
+      }
+
+      fins.forEach(({ el, baseAngle }) => {
+        const angle = baseAngle + currentAngle;
+        el.style.transform = `rotateX(${angle.toFixed(2)}deg)`;
+
+        // Subtle shallow depth-of-field blur on horizontal fins matching the video
+        const rad = (angle * Math.PI) / 180;
+        const uprightness = Math.abs(Math.cos(rad)); // 1 when vertical, 0 when horizontal
+        const blurPx = (1 - uprightness) * 1.4;
+        el.style.filter = blurPx > 0.35 ? `blur(${blurPx.toFixed(2)}px)` : 'none';
+      });
+
+      requestAnimationFrame(renderRolodex);
+    }
+
+    viewport.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      autoSpin = false;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      lastTime = performance.now();
+      velocity = 0;
+      viewport.setPointerCapture(e.pointerId);
+    });
+
+    viewport.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const now = performance.now();
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      const dt = Math.max(1, now - lastTime);
+
+      const delta = (-dy * 0.45) + (dx * 0.35);
+      targetAngle += delta;
+      velocity = delta / dt;
+
+      lastX = e.clientX;
+      lastY = e.clientY;
+      lastTime = now;
+    });
+
+    function endDrag() {
+      if (!isDragging) return;
+      isDragging = false;
+      targetAngle += velocity * 140;
+      setTimeout(() => {
+        if (!isDragging) autoSpin = true;
+      }, 1800);
+    }
+
+    viewport.addEventListener('pointerup', endDrag);
+    viewport.addEventListener('pointercancel', endDrag);
+
+    window.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      autoSpin = false;
+      targetAngle += (e.deltaY || e.deltaX) * 0.25;
+      clearTimeout(window._spinTimer);
+      window._spinTimer = setTimeout(() => { autoSpin = true; }, 1800);
+    }, { passive: false });
+
+    requestAnimationFrame(renderRolodex);
+  </script>
+</body>
+</html>

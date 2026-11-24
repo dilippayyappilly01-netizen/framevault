@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visual Archive — 16 works · Edition 01</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #ededed;
+      color: #222;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Header & Footer positioned matching the screen recording */
+    header {
+      position: fixed;
+      top: 17vh;
+      left: 0;
+      width: 100%;
+      padding: 0 48px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      color: #333;
+      z-index: 30;
+      pointer-events: none;
+    }
+
+    footer {
+      position: fixed;
+      bottom: 17vh;
+      left: 0;
+      width: 100%;
+      padding: 0 48px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 400;
+      letter-spacing: 0.01em;
+      color: #555;
+      z-index: 30;
+      pointer-events: none;
+    }
+
+    /* Ring Stage */
+    .viewport {
+      position: absolute;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .viewport:active {
+      cursor: grabbing;
+    }
+
+    .ring-container {
+      position: relative;
+      width: 0;
+      height: 0;
+    }
+
+    .ring-item {
+      position: absolute;
+      width: 140px;
+      height: 140px;
+      margin-left: -70px;
+      margin-top: -70px;
+      overflow: hidden;
+      background: #dcdcdc;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.09);
+      will-change: transform;
+      transform-origin: center center;
+    }
+
+    .ring-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      pointer-events: none;
+      image-rendering: -webkit-optimize-contrast;
+      transform: translateZ(0);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>Visual Archive</div>
+    <div>16 works · Edition 01</div>
+  </header>
+
+  <div class="viewport" id="viewport">
+    <div class="ring-container" id="ring"></div>
+  </div>
+
+  <footer>
+    <div>Drag to explore</div>
+    <div id="pauseLabel">Tap to pause / resume</div>
+  </footer>
+
+  <script>
+    const IMAGES = [
+      'images/1.jpg',
+      'images/2.jpg',
+      'images/3.jpg',
+      'images/4.jpg',
+      'images/5.jpg',
+      'images/6.jpg',
+      'images/7.jpg',
+      'images/8.jpg',
+      'images/9.jpg',
+      'images/10.jpg',
+      'images/11.jpg',
+      'images/12.jpg'
+    ];
+
+    const TOTAL_ITEMS = 16;
+    const ring = document.getElementById('ring');
+    const viewport = document.getElementById('viewport');
+
+    const items = [];
+    for (let i = 0; i < TOTAL_ITEMS; i++) {
+      const el = document.createElement('div');
+      el.className = 'ring-item';
+      const src = IMAGES[i % IMAGES.length];
+      el.innerHTML = `<img src="${src}" alt="Work ${i + 1}" loading="eager" decoding="sync" fetchpriority="high">`;
+      ring.appendChild(el);
+      items.push({ el, index: i });
+    }
+
+    let angleOffset = 0;
+    let targetAngle = 0;
+    let isPaused = false;
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let pointerDownX = 0;
+    let pointerDownY = 0;
+    let lastAngle = 0;
+    let angularVelocity = 0;
+    let lastTime = 0;
+
+    function getPointerAngle(clientX, clientY) {
+      const cx = window.innerWidth * 0.5;
+      const cy = window.innerHeight * 0.5;
+      return Math.atan2(clientY - cy, clientX - cx);
+    }
+
+    function renderRing() {
+      if (!isDragging && !isPaused) {
+        targetAngle -= 0.0042; // Smooth counter-clockwise orbit matching video
+      }
+
+      if (!isDragging) {
+        angleOffset += (targetAngle - angleOffset) * 0.12;
+      } else {
+        angleOffset = targetAngle;
+      }
+
+      const radius = Math.min(window.innerWidth, window.innerHeight) * 0.235;
+      const step = (Math.PI * 2) / TOTAL_ITEMS;
+
+      items.forEach(({ el, index }) => {
+        const theta = index * step + angleOffset;
+        const x = radius * Math.cos(theta);
+        const y = radius * Math.sin(theta);
+
+        // Normalized horizontal position: 1 at right (3 o'clock), 0 at left (9 o'clock)
+        const t = (Math.cos(theta) + 1) * 0.5;
+        // Scale ranges from 0.055 on far left up to 1.05 on far right
+        const scale = 0.055 + 0.995 * Math.pow(t, 1.75);
+
+        el.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`;
+        el.style.zIndex = Math.round(t * 100);
+      });
+
+      requestAnimationFrame(renderRing);
+    }
+
+    viewport.addEventListener('pointerdown', (e) => {
+      isDragging = true;
+      pointerDownX = e.clientX;
+      pointerDownY = e.clientY;
+      lastAngle = getPointerAngle(e.clientX, e.clientY);
+      lastTime = performance.now();
+      angularVelocity = 0;
+      viewport.setPointerCapture(e.pointerId);
+    });
+
+    viewport.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      const now = performance.now();
+      const dt = Math.max(1, now - lastTime);
+
+      const curAngle = getPointerAngle(e.clientX, e.clientY);
+      let dAngle = curAngle - lastAngle;
+      // Wrap angle delta across -PI / +PI boundary
+      if (dAngle > Math.PI) dAngle -= Math.PI * 2;
+      if (dAngle < -Math.PI) dAngle += Math.PI * 2;
+
+      targetAngle += dAngle;
+      angularVelocity = dAngle / dt;
+
+      lastAngle = curAngle;
+      lastTime = now;
+    });
+
+    function endDrag(e) {
+      if (!isDragging) return;
+      isDragging = false;
+
+      const moveDist = Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY);
+      if (moveDist < 6) {
+        // Tap to pause / resume
+        isPaused = !isPaused;
+      } else {
+        targetAngle += angularVelocity * 160;
+      }
+    }
+
+    viewport.addEventListener('pointerup', endDrag);
+    viewport.addEventListener('pointercancel', endDrag);
+
+    window.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      targetAngle += (e.deltaY || e.deltaX) * 0.0018;
+    }, { passive: false });
+
+    requestAnimationFrame(renderRing);
+  </script>
+</body>
+</html>
