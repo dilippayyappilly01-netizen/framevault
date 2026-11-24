@@ -391,7 +391,51 @@
     return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
   }
 
+  function syncDynamicCatalogStats() {
+    const totalCount = components.length;
+    document.querySelectorAll('[data-total-count]').forEach(el => {
+      el.textContent = String(totalCount);
+    });
+
+    const engineCounts = {
+      ALL: totalCount,
+      'WEBGL 3D': 0,
+      'DOM 3D': 0,
+      'CANVAS 2D': 0
+    };
+    for (const c of components) {
+      if (c.engine in engineCounts) engineCounts[c.engine]++;
+    }
+    document.querySelectorAll('[data-engine-count]').forEach(el => {
+      const key = el.getAttribute('data-engine-count');
+      if (key && key in engineCounts) el.textContent = String(engineCounts[key]);
+    });
+
+    const heroStatsEl = document.getElementById('heroStatsPills');
+    if (heroStatsEl) {
+      heroStatsEl.innerHTML = sections
+        .map(sec => `<div class="ok-stat-pill"><span class="ok-stat-num">${sec.count}</span><span class="ok-stat-label">${escapeHtml(formatSectionLabel(sec.name))}</span></div>`)
+        .join('');
+    }
+
+    const topQuickWrap = document.getElementById('topQuickSecWrap');
+    if (topQuickWrap) {
+      topQuickWrap.innerHTML = sections
+        .map(sec => `<button class="ok-top-link ${activeSection === sec.id ? 'active' : ''}" data-quick-sec="${escapeHtml(sec.id)}">${escapeHtml(formatSectionLabel(sec.name))}</button>`)
+        .join('');
+      topQuickWrap.querySelectorAll('.ok-top-link[data-quick-sec]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeSection = btn.getAttribute('data-quick-sec') || 'all';
+          renderNavigation();
+          renderGallery();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+      });
+    }
+  }
+
   function renderNavigation() {
+    syncDynamicCatalogStats();
     const totalCount = components.length;
     if (navSectionsEl) {
       let pillsHtml = `
@@ -2248,7 +2292,7 @@
 
     const statusPill = document.getElementById('pricingStatusPill');
     if (statusPill) {
-      statusPill.textContent = unlocked ? 'Unlocked' : '50 Components';
+      statusPill.textContent = unlocked ? 'Unlocked' : `${components.length} Components`;
       statusPill.classList.toggle('unlocked', unlocked);
     }
 

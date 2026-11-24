@@ -10,6 +10,7 @@
     "start": "node server.js",
     "test": "node --test test/backend.test.js",
     "mcp:build": "npm --prefix mcp-server run build",
-    "tsx:generate": "node scripts/generate-tsx.js"
+    "tsx:generate": "node scripts/generate-tsx.js",
+    "sync": "node scripts/sync-library.js"
   }
 }

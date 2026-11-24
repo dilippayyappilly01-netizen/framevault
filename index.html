@@ -28,15 +28,17 @@
             <rect x="16.5" y="16.5" width="5.5" height="5.5" rx="1.2"/>
           </svg>
           <span class="ok-brand-title">FrameVault</span>
-          <span class="ok-brand-badge">50</span>
+          <span class="ok-brand-badge" data-total-count>50</span>
         </a>
 
-        <nav class="ok-top-links" aria-label="Primary Navigation">
+        <nav class="ok-top-links" id="topNavLinks" aria-label="Primary Navigation">
           <button class="ok-top-link active" id="btnHomeTop">Library</button>
-          <button class="ok-top-link" data-quick-sec="orbs">Orbs</button>
-          <button class="ok-top-link" data-quick-sec="assets">Assets</button>
-          <button class="ok-top-link" data-quick-sec="carasols">Carasols</button>
-          <button class="ok-top-link" data-quick-sec="cubes">Cubes</button>
+          <span id="topQuickSecWrap" style="display:contents;">
+            <button class="ok-top-link" data-quick-sec="orbs">Orbs</button>
+            <button class="ok-top-link" data-quick-sec="assets">Assets</button>
+            <button class="ok-top-link" data-quick-sec="carasols">Carasols</button>
+            <button class="ok-top-link" data-quick-sec="cubes">Cubes</button>
+          </span>
           <button class="ok-top-link" id="btnNavMcp">MCP</button>
           <button class="ok-top-link" id="btnNavPricing">Pricing</button>
         </nav>
@@ -81,7 +83,7 @@
           </p>
         </div>
 
-        <div class="ok-hero-stats">
+        <div class="ok-hero-stats" id="heroStatsPills">
           <div class="ok-stat-pill"><span class="ok-stat-num">5</span><span class="ok-stat-label">Orbs</span></div>
           <div class="ok-stat-pill"><span class="ok-stat-num">21</span><span class="ok-stat-label">Assets</span></div>
           <div class="ok-stat-pill"><span class="ok-stat-num">22</span><span class="ok-stat-label">Carasols</span></div>
@@ -111,16 +113,16 @@
       <div class="ok-catbar-row ok-catbar-chips-row">
         <div class="ok-catchips">
           <button class="ok-chip active" data-engine-filter="ALL">
-            All <span class="ok-chip-count">50</span>
+            All <span class="ok-chip-count" data-engine-count="ALL">50</span>
           </button>
           <button class="ok-chip" data-engine-filter="WEBGL 3D">
-            WebGL Shaders <span class="ok-chip-count">26</span>
+            WebGL Shaders <span class="ok-chip-count" data-engine-count="WEBGL 3D">26</span>
           </button>
           <button class="ok-chip" data-engine-filter="DOM 3D">
-            DOM 3D <span class="ok-chip-count">18</span>
+            DOM 3D <span class="ok-chip-count" data-engine-count="DOM 3D">18</span>
           </button>
           <button class="ok-chip" data-engine-filter="CANVAS 2D">
-            Canvas Physics <span class="ok-chip-count">6</span>
+            Canvas Physics <span class="ok-chip-count" data-engine-count="CANVAS 2D">6</span>
           </button>
           <button class="ok-chip" id="btnFilterModified">
             Edited <span class="ok-chip-count" id="modifiedCountBadge">0</span>
@@ -242,7 +244,7 @@
         <span class="ok-hero-eyebrow">Simple pricing</span>
         <h2 class="ok-pricing-title"><span data-price-text>$4.99</span> for full HTML &amp; React TypeScript access</h2>
         <p class="ok-pricing-sub">
-          Explore and customize all 50 live 3D shaders, cubes, orbs &amp; carousels freely. Pay <span data-price-text>$4.99</span> once to unlock Copy &amp; Studio source code plus unlimited standalone <code>.html</code> and TypeScript React <code>.tsx</code> downloads across the entire library.
+          Explore and customize all <span data-total-count>50</span> live 3D shaders, cubes, orbs &amp; carousels freely. Pay <span data-price-text>$4.99</span> once to unlock Copy &amp; Studio source code plus unlimited standalone <code>.html</code> and TypeScript React <code>.tsx</code> downloads across the entire library.
         </p>
       </div>
 
@@ -263,7 +265,7 @@
             <li><span class="ok-check ok-check-muted">&times;</span><span>Download standalone <code>.html</code> files (locked)</span></li>
             <li><span class="ok-check ok-check-muted">&times;</span><span>Copy HTML &amp; Studio Source Inspector (locked)</span></li>
           </ul>
-          <button class="ok-btn-secondary ok-price-btn" id="btnFreeBrowseScroll" type="button">Browse all 50 components</button>
+          <button class="ok-btn-secondary ok-price-btn" id="btnFreeBrowseScroll" type="button">Browse all <span data-total-count>50</span> components</button>
         </div>
 
         <!-- Paid All-Access Tier ($4.99) -->
@@ -399,9 +401,9 @@
       </div>
 
       <div class="ok-checkout-summary">
-        <div class="ok-summary-info">
-          <strong>Entire Component Library (50 components)</strong>
-          <span>Unlimited standalone <code>.html</code> downloads &amp; copy HTML</span>
+          <div class="ok-summary-info">
+          <strong>Entire Component Library (<span data-total-count>50</span> components)</strong>
+          <span>Unlimited standalone <code>.html</code>, React <code>.tsx</code> &amp; Figma exports</span>
         </div>
         <div class="ok-summary-price" data-price-text>$4.99</div>
       </div>

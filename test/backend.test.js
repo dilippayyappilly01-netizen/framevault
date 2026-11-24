@@ -121,7 +121,7 @@ test('health check and static file security boundaries', async () => {
     assert.equal(health.status, 200);
     assert.equal(health.json.ok, true);
     assert.equal(health.json.db, 'sqlite');
-    assert.equal(health.json.components, 50);
+    assert.ok(health.json.components >= 50);
     assert.equal(health.headers['x-content-type-options'], 'nosniff');
     assert.equal(health.headers['x-frame-options'], 'SAMEORIGIN');
 
@@ -165,7 +165,7 @@ test('paywall leak closed: catalog endpoints never expose htmlSource or htmlPath
     const libRes = await request(srv.baseUrl, '/api/library');
     assert.equal(libRes.status, 200);
     assert.equal(libRes.json.unlocked, false);
-    assert.equal(libRes.json.components.length, 50);
+    assert.ok(libRes.json.components.length >= 50);
     for (const comp of libRes.json.components) {
       assert.equal('htmlSource' in comp, false, `htmlSource leaked on ${comp.id}`);
       assert.equal('htmlPath' in comp, false, `htmlPath leaked on ${comp.id}`);

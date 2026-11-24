@@ -1,4 +1,4 @@
-// Auto-generated OriginKit Component Catalog from designs/ folder (50 components across 4 sections)
+// Auto-generated FrameVault Component Catalog from designs/ folder (51 components across 4 sections)
 window.ORIGINKIT_SECTIONS = [
   {
     "id": "orbs",
@@ -10,7 +10,7 @@ window.ORIGINKIT_SECTIONS = [
     "id": "assets",
     "name": "ASSETS",
     "folderName": "assets",
-    "count": 21
+    "count": 22
   },
   {
     "id": "carasols",
@@ -11123,6 +11123,401 @@ window.ORIGINKIT_COMPONENTS = [
             ]
           }
         ],
+        "stringParams": [],
+        "imageSlots": []
+      }
+    }
+  },
+  {
+    "id": "assets__asset-20",
+    "section": "assets",
+    "name": "asset 20",
+    "rawTitle": "Asset 20 — 3D Interactive Cursor-Repelled Bubble Sphere",
+    "displayTitle": "Asset 20 — 3D Interactive Cursor-Repelled Bubble Sphere",
+    "folderPath": "designs/assets/asset 20/",
+    "htmlPath": "designs/assets/asset 20/index.html",
+    "videoPath": "",
+    "engine": "WEBGL 3D",
+    "hasImages": false,
+    "hasBlueDefault": false,
+    "defaultBgColor": "#000000",
+    "htmlSource": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Asset 20 — 3D Interactive Cursor-Repelled Bubble Sphere</title>\n<style>\n  *, *::before, *::after {\n    box-sizing: border-box;\n    margin: 0;\n    padding: 0;\n  }\n\n  html, body {\n    width: 100%;\n    height: 100%;\n    overflow: hidden;\n    background: #000000;\n    user-select: none;\n    -webkit-font-smoothing: antialiased;\n  }\n\n  canvas {\n    display: block;\n    width: 100vw;\n    height: 100vh;\n    cursor: grab;\n  }\n\n  canvas:active {\n    cursor: grabbing;\n  }\n</style>\n</head>\n<body>\n<canvas id=\"glCanvas\"></canvas>\n\n<script>\n(() => {\n  const canvas = document.getElementById('glCanvas');\n  const gl = canvas.getContext('webgl2', { antialias: true }) ||\n             canvas.getContext('webgl', { antialias: true });\n  if (!gl) return;\n\n  const vsSource = `\n    attribute vec3 aPos;\n    attribute float aRadius;\n    attribute vec3 aColor;\n\n    uniform vec2 uResolution;\n\n    varying vec3 vColor;\n    varying float vDepth;\n\n    void main() {\n      float fov = 3.2;\n      float persp = fov / (fov - aPos.z * 0.52);\n\n      float aspect = uResolution.x / max(uResolution.y, 1.0);\n      float scale = 0.68;\n\n      gl_Position = vec4(\n        (aPos.x * scale * persp) / aspect,\n        aPos.y * scale * persp,\n        0.0,\n        1.0\n      );\n\n      gl_PointSize = aRadius * uResolution.y * 1.38 * persp;\n      vColor = aColor;\n      vDepth = smoothstep(-1.15, 1.05, aPos.z);\n    }\n  `;\n\n  const fsSource = `\n    precision highp float;\n    varying vec3 vColor;\n    varying float vDepth;\n\n    void main() {\n      vec2 p = (gl_PointCoord - 0.5) * 2.0;\n      p.y = -p.y;\n      float r2 = dot(p, p);\n      if (r2 > 1.0) discard;\n\n      float z = sqrt(max(0.0, 1.0 - r2));\n      vec3 n = vec3(p, z);\n\n      vec3 lightDir = normalize(vec3(0.45, 0.55, 0.70));\n      float diff = max(0.0, dot(n, lightDir));\n      float fresnel = pow(1.0 - z, 1.85);\n      float spec = pow(max(0.0, dot(reflect(-lightDir, n), vec3(0.0, 0.0, 1.0))), 22.0);\n\n      vec3 base = vColor * (0.42 + 0.62 * diff);\n      vec3 rim  = mix(vColor * 1.35, vec3(0.88, 0.96, 1.0), 0.55) * fresnel * 0.78;\n      vec3 col  = (base + rim + vec3(0.9, 0.97, 1.0) * spec * 0.52) * mix(0.28, 1.05, vDepth);\n\n      float edgeAA = 1.0 - smoothstep(0.88, 1.0, r2);\n      float alpha = mix(0.68, 0.95, fresnel) * edgeAA * mix(0.45, 1.0, vDepth);\n\n      gl_FragColor = vec4(col, alpha);\n    }\n  `;\n\n  function compile(type, src) {\n    const s = gl.createShader(type);\n    gl.shaderSource(s, src);\n    gl.compileShader(s);\n    return s;\n  }\n\n  const prog = gl.createProgram();\n  gl.attachShader(prog, compile(gl.VERTEX_SHADER, vsSource));\n  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fsSource));\n  gl.linkProgram(prog);\n  gl.useProgram(prog);\n\n  const COUNT = 820;\n  const GOLDEN_ANGLE = Math.PI * (3.0 - Math.sqrt(5.0));\n  const bubbles = new Array(COUNT);\n\n  for (let i = 0; i < COUNT; i++) {\n    const y = 1.0 - (i / (COUNT - 1)) * 2.0;\n    const r = Math.sqrt(Math.max(0.0, 1.0 - y * y));\n    const theta = GOLDEN_ANGLE * i;\n    const x = Math.cos(theta) * r;\n    const z = Math.sin(theta) * r;\n\n    const uX = Math.max(0.0, Math.min(1.0, (x + 1.0) * 0.5));\n    const scatter = Math.pow(1.0 - uX, 2.2) * 0.28;\n    const bx = x - scatter * (0.3 + Math.random() * 0.9);\n    const by = y * (1.0 + (Math.random() - 0.5) * scatter * 0.45);\n    const bz = z * (1.0 + (Math.random() - 0.5) * scatter * 0.45);\n\n    const baseRadius = 0.007 + Math.pow(uX, 0.85) * 0.046 * (0.82 + Math.random() * 0.32);\n\n    let cr, cg, cb;\n    const rnd = Math.random();\n    if (uX > 0.58) {\n      if (rnd < 0.45)      { cr = 0.48; cg = 0.86; cb = 1.00; }\n      else if (rnd < 0.80) { cr = 0.24; cg = 0.66; cb = 0.98; }\n      else                 { cr = 0.68; cg = 0.92; cb = 1.00; }\n    } else {\n      if (rnd < 0.16)      { cr = 0.12; cg = 0.74; cb = 0.62; }\n      else if (y > 0.15)   { cr = 0.38; cg = 0.34; cb = 0.94; }\n      else                 { cr = 0.14; cg = 0.32; cb = 0.88; }\n    }\n\n    bubbles[i] = {\n      bx, by, bz,\n      cx: bx, cy: by, cz: bz,\n      vx: 0, vy: 0, vz: 0,\n      radius: baseRadius,\n      cr, cg, cb,\n      phase: Math.random() * Math.PI * 2\n    };\n  }\n\n  const posArray = new Float32Array(COUNT * 3);\n  const radArray = new Float32Array(COUNT);\n  const colArray = new Float32Array(COUNT * 3);\n\n  const posBuf = gl.createBuffer();\n  const radBuf = gl.createBuffer();\n  const colBuf = gl.createBuffer();\n\n  const aPosLoc = gl.getAttribLocation(prog, 'aPos');\n  const aRadLoc = gl.getAttribLocation(prog, 'aRadius');\n  const aColLoc = gl.getAttribLocation(prog, 'aColor');\n  const uResLoc = gl.getUniformLocation(prog, 'uResolution');\n\n  function resize() {\n    const dpr = Math.min(window.devicePixelRatio || 1, 2);\n    canvas.width = Math.round(window.innerWidth * dpr);\n    canvas.height = Math.round(window.innerHeight * dpr);\n    gl.viewport(0, 0, canvas.width, canvas.height);\n  }\n  window.addEventListener('resize', resize);\n  resize();\n\n  let ptrX = -999;\n  let ptrY = -999;\n  let ptrActive = false;\n\n  window.addEventListener('pointermove', (e) => {\n    const vw = Math.max(window.innerWidth, 1);\n    const vh = Math.max(window.innerHeight, 1);\n    const aspect = vw / vh;\n    const ndcX = ((e.clientX / vw) * 2 - 1) * aspect;\n    const ndcY = 1 - (e.clientY / vh) * 2;\n    ptrX = ndcX / 0.68;\n    ptrY = ndcY / 0.68;\n    ptrActive = true;\n  });\n\n  window.addEventListener('pointerleave', () => {\n    ptrActive = false;\n  });\n\n  gl.enable(gl.BLEND);\n  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);\n  gl.clearColor(0.0, 0.0, 0.0, 1.0);\n\n  const sortedIndices = Array.from({ length: COUNT }, (_, i) => i);\n\n  function render(now) {\n    const t = now * 0.001;\n    const rotY = Math.sin(t * 0.45) * 0.14;\n    const rotX = Math.cos(t * 0.38) * 0.08;\n    const cy = Math.cos(rotY), sy = Math.sin(rotY);\n    const cx = Math.cos(rotX), sx = Math.sin(rotX);\n\n    for (let i = 0; i < COUNT; i++) {\n      const b = bubbles[i];\n\n      const rx1 = b.bx * cy - b.bz * sy;\n      const rz1 = b.bx * sy + b.bz * cy;\n      const ry2 = b.by * cx - rz1 * sx;\n      const rz2 = b.by * sx + rz1 * cx;\n\n      const tx = rx1 + Math.sin(t * 1.4 + b.phase) * 0.008;\n      const ty = ry2 + Math.cos(t * 1.2 + b.phase) * 0.008;\n      const tz = rz2;\n\n      let fx = (tx - b.cx) * 0.085;\n      let fy = (ty - b.cy) * 0.085;\n      let fz = (tz - b.cz) * 0.085;\n\n      if (ptrActive && b.cz > -0.35) {\n        const dx = b.cx - ptrX;\n        const dy = b.cy - ptrY;\n        const dist2D = Math.hypot(dx, dy);\n        const repelRadius = 0.44;\n        if (dist2D < repelRadius && dist2D > 0.001) {\n          const force = Math.pow(1.0 - dist2D / repelRadius, 2.0) * 0.068;\n          fx += (dx / dist2D) * force;\n          fy += (dy / dist2D) * force;\n          fz -= force * 0.25;\n        }\n      }\n\n      b.vx = (b.vx + fx) * 0.82;\n      b.vy = (b.vy + fy) * 0.82;\n      b.vz = (b.vz + fz) * 0.82;\n\n      b.cx += b.vx;\n      b.cy += b.vy;\n      b.cz += b.vz;\n    }\n\n    sortedIndices.sort((a, b) => bubbles[a].cz - bubbles[b].cz);\n\n    for (let i = 0; i < COUNT; i++) {\n      const b = bubbles[sortedIndices[i]];\n      posArray[i * 3]     = b.cx;\n      posArray[i * 3 + 1] = b.cy;\n      posArray[i * 3 + 2] = b.cz;\n      radArray[i]         = b.radius;\n      colArray[i * 3]     = b.cr;\n      colArray[i * 3 + 1] = b.cg;\n      colArray[i * 3 + 2] = b.cb;\n    }\n\n    gl.clear(gl.COLOR_BUFFER_BIT);\n    gl.uniform2f(uResLoc, canvas.width, canvas.height);\n\n    gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);\n    gl.bufferData(gl.ARRAY_BUFFER, posArray, gl.DYNAMIC_DRAW);\n    gl.enableVertexAttribArray(aPosLoc);\n    gl.vertexAttribPointer(aPosLoc, 3, gl.FLOAT, false, 0, 0);\n\n    gl.bindBuffer(gl.ARRAY_BUFFER, radBuf);\n    gl.bufferData(gl.ARRAY_BUFFER, radArray, gl.DYNAMIC_DRAW);\n    gl.enableVertexAttribArray(aRadLoc);\n    gl.vertexAttribPointer(aRadLoc, 1, gl.FLOAT, false, 0, 0);\n\n    gl.bindBuffer(gl.ARRAY_BUFFER, colBuf);\n    gl.bufferData(gl.ARRAY_BUFFER, colArray, gl.DYNAMIC_DRAW);\n    gl.enableVertexAttribArray(aColLoc);\n    gl.vertexAttribPointer(aColLoc, 3, gl.FLOAT, false, 0, 0);\n\n    gl.drawArrays(gl.POINTS, 0, COUNT);\n    requestAnimationFrame(render);\n  }\n\n  requestAnimationFrame(render);\n})();\n</script>\n</body>\n</html>\n",
+    "controlParameterSet": {
+      "speeds": {
+        "animationSpeed": {
+          "label": "MASTER ANIMATION SPEED",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0,
+          "max": 4,
+          "step": 0.05,
+          "unit": "x"
+        },
+        "autoPlay": {
+          "label": "AUTO-PLAY / CONTINUOUS MOTION",
+          "value": true,
+          "defaultValue": true,
+          "type": "toggle"
+        },
+        "reverseDirection": {
+          "label": "REVERSE MOTION DIRECTION",
+          "value": false,
+          "defaultValue": false,
+          "type": "toggle"
+        },
+        "autoDrive": {
+          "label": "AUTO-ORBIT / AUTO-SCROLL DRIVE",
+          "value": false,
+          "defaultValue": false,
+          "type": "toggle"
+        },
+        "dragSensitivity": {
+          "label": "POINTER DRAG SENSITIVITY",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0.2,
+          "max": 3,
+          "step": 0.1,
+          "unit": "x"
+        },
+        "motionSmoothing": {
+          "label": "INERTIA / DAMPING FACTOR",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0.2,
+          "max": 3,
+          "step": 0.1,
+          "unit": "x"
+        },
+        "componentSpeeds": []
+      },
+      "effects": {
+        "scale": {
+          "label": "STAGE SCALE / ZOOM",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0.4,
+          "max": 2.2,
+          "step": 0.05,
+          "unit": "x"
+        },
+        "perspective": {
+          "label": "3D PERSPECTIVE DEPTH",
+          "value": 900,
+          "defaultValue": 900,
+          "min": 200,
+          "max": 2400,
+          "step": 25,
+          "unit": "px"
+        },
+        "tiltX": {
+          "label": "3D STAGE TILT X",
+          "value": 0,
+          "defaultValue": 0,
+          "min": -45,
+          "max": 45,
+          "step": 1,
+          "unit": "deg"
+        },
+        "tiltY": {
+          "label": "3D STAGE TILT Y",
+          "value": 0,
+          "defaultValue": 0,
+          "min": -45,
+          "max": 45,
+          "step": 1,
+          "unit": "deg"
+        },
+        "rotateZ": {
+          "label": "STAGE ROTATION Z",
+          "value": 0,
+          "defaultValue": 0,
+          "min": -180,
+          "max": 180,
+          "step": 1,
+          "unit": "deg"
+        },
+        "blur": {
+          "label": "OPTICAL GAUSSIAN BLUR",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 20,
+          "step": 0.5,
+          "unit": "px"
+        },
+        "glowIntensity": {
+          "label": "BLOOM / DROP-GLOW STRENGTH",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 60,
+          "step": 1,
+          "unit": "px"
+        },
+        "glowColor": {
+          "label": "BLOOM GLOW COLOUR",
+          "value": "#ff5500",
+          "defaultValue": "#ff5500",
+          "type": "color"
+        },
+        "liquidDistortion": {
+          "label": "LIQUID SVG TURBULENCE WARP",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 80,
+          "step": 1,
+          "unit": ""
+        },
+        "liquidFrequency": {
+          "label": "TURBULENCE WAVE FREQUENCY",
+          "value": 0.015,
+          "defaultValue": 0.015,
+          "min": 0.002,
+          "max": 0.06,
+          "step": 0.002,
+          "unit": ""
+        },
+        "vignette": {
+          "label": "STUDIO RADIAL VIGNETTE",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 90,
+          "step": 2,
+          "unit": "%"
+        },
+        "componentEffects": []
+      },
+      "colours": {
+        "backgroundColor": {
+          "label": "STAGE BACKGROUND COLOUR",
+          "value": "#000000",
+          "defaultValue": "#000000",
+          "type": "color"
+        },
+        "hueRotate": {
+          "label": "HUE SHIFT ANGLE",
+          "value": 0,
+          "defaultValue": 0,
+          "min": -180,
+          "max": 180,
+          "step": 1,
+          "unit": "deg"
+        },
+        "saturate": {
+          "label": "COLOUR SATURATION",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 0,
+          "max": 300,
+          "step": 5,
+          "unit": "%"
+        },
+        "brightness": {
+          "label": "EXPOSURE BRIGHTNESS",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 40,
+          "max": 220,
+          "step": 5,
+          "unit": "%"
+        },
+        "contrast": {
+          "label": "TONAL CONTRAST",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 40,
+          "max": 220,
+          "step": 5,
+          "unit": "%"
+        },
+        "invert": {
+          "label": "INVERT / NEGATIVE",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "unit": "%"
+        },
+        "sepia": {
+          "label": "WARM SEPIA FILTER",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "unit": "%"
+        },
+        "tintColor": {
+          "label": "OVERLAY TINT COLOUR",
+          "value": "#ff5500",
+          "defaultValue": "#ff5500",
+          "type": "color"
+        },
+        "tintOpacity": {
+          "label": "OVERLAY TINT OPACITY",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 85,
+          "step": 5,
+          "unit": "%"
+        },
+        "hexColorParams": [
+          {
+            "key": "hex_1",
+            "label": "PRIMARY SURFACE HEX",
+            "value": "#000000",
+            "defaultValue": "#000000",
+            "rawHex": "#000000"
+          }
+        ],
+        "shaderColorParams": []
+      },
+      "htmlProperties": {
+        "documentTitle": {
+          "label": "HTML <TITLE> PROPERTY",
+          "value": "Asset 20 — 3D Interactive Cursor-Repelled Bubble Sphere",
+          "defaultValue": "Asset 20 — 3D Interactive Cursor-Repelled Bubble Sphere",
+          "type": "text"
+        },
+        "bodyId": {
+          "label": "BODY [ID] ATTRIBUTE",
+          "value": "assets-asset-20",
+          "defaultValue": "assets-asset-20",
+          "type": "text"
+        },
+        "bodyClass": {
+          "label": "BODY [CLASS] ATTRIBUTE",
+          "value": "",
+          "defaultValue": "",
+          "type": "text"
+        },
+        "bodyDir": {
+          "label": "HTML [DIR] DIRECTION",
+          "value": "ltr",
+          "defaultValue": "ltr",
+          "options": [
+            "ltr",
+            "rtl"
+          ]
+        },
+        "dataTheme": {
+          "label": "BODY [DATA-THEME] ATTRIBUTE",
+          "value": "dark-carbon",
+          "defaultValue": "dark-carbon",
+          "type": "text"
+        },
+        "fontFamily": {
+          "label": "COMPONENT FONT-FAMILY",
+          "value": "Inter, system-ui, sans-serif",
+          "defaultValue": "Inter, system-ui, sans-serif",
+          "options": [
+            "Inter, system-ui, sans-serif",
+            "monospace",
+            "sans-serif"
+          ]
+        },
+        "cursor": {
+          "label": "STAGE [STYLE.CURSOR]",
+          "value": "grab",
+          "defaultValue": "grab",
+          "options": [
+            "default",
+            "grab",
+            "pointer",
+            "crosshair",
+            "none"
+          ]
+        },
+        "overflow": {
+          "label": "BODY [STYLE.OVERFLOW]",
+          "value": "hidden",
+          "defaultValue": "hidden",
+          "options": [
+            "hidden",
+            "visible",
+            "auto"
+          ]
+        },
+        "opacity": {
+          "label": "BODY [STYLE.OPACITY]",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0.1,
+          "max": 1,
+          "step": 0.05
+        },
+        "padding": {
+          "label": "BODY [STYLE.PADDING]",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 64,
+          "step": 2,
+          "unit": "px"
+        },
+        "borderRadius": {
+          "label": "STAGE [STYLE.BORDER-RADIUS]",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 80,
+          "step": 2,
+          "unit": "px"
+        },
+        "borderWidth": {
+          "label": "STAGE [STYLE.BORDER-WIDTH]",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 16,
+          "step": 1,
+          "unit": "px"
+        },
+        "borderColor": {
+          "label": "STAGE [STYLE.BORDER-COLOR]",
+          "value": "#ff5500",
+          "defaultValue": "#ff5500",
+          "type": "color"
+        },
+        "stageWidth": {
+          "label": "STAGE [STYLE.WIDTH]",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 30,
+          "max": 100,
+          "step": 2,
+          "unit": "%"
+        },
+        "stageHeight": {
+          "label": "STAGE [STYLE.HEIGHT]",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 30,
+          "max": 100,
+          "step": 2,
+          "unit": "%"
+        },
+        "mixBlendMode": {
+          "label": "STAGE [STYLE.MIX-BLEND-MODE]",
+          "value": "normal",
+          "defaultValue": "normal",
+          "options": [
+            "normal",
+            "screen",
+            "lighten",
+            "multiply",
+            "difference",
+            "exclusion",
+            "overlay"
+          ]
+        },
+        "domElements": [],
+        "cssRuleParams": [],
         "stringParams": [],
         "imageSlots": []
       }
