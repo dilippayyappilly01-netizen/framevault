@@ -7,7 +7,7 @@ const rootDir = path.resolve(__dirname, '..');
 const designsDir = path.join(rootDir, 'designs');
 const catalogFile = path.join(rootDir, 'components-data.js');
 
-const DEFAULT_SECTION_ORDER = ['orbs', 'assets', 'carasols', 'cubes'];
+const DEFAULT_SECTION_ORDER = ['orbs', 'assets', 'carasols', 'cubes', 'backgrounds'];
 
 function slugify(str) {
   return String(str || '')

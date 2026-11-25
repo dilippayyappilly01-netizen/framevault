@@ -48,9 +48,10 @@ const QUERY_SYNONYMS: Record<string, string[]> = {
   sphere: ["orb", "orbs", "globe", "ball"],
   cube: ["cubes", "voxel", "box", "crystal"],
   cubes: ["cube", "voxel", "box", "crystal"],
-  shader: ["webgl", "glsl", "fragment", "shaders", "background"],
-  shaders: ["webgl", "glsl", "fragment", "shader", "background"],
-  background: ["shader", "shaders", "tunnel", "vortex", "wave", "galaxy", "nebula"],
+  shader: ["webgl", "glsl", "fragment", "shaders", "background", "backgrounds"],
+  shaders: ["webgl", "glsl", "fragment", "shader", "background", "backgrounds"],
+  background: ["backgrounds", "shader", "shaders", "tunnel", "vortex", "wave", "galaxy", "nebula", "aurora", "caustic", "ferrofluid"],
+  backgrounds: ["background", "shader", "shaders", "tunnel", "vortex", "wave", "galaxy", "nebula", "aurora", "caustic", "ferrofluid"],
   particle: ["particles", "points", "vortex", "tunnel", "galaxy", "star", "dust"],
   particles: ["particle", "points", "vortex", "tunnel", "galaxy", "star"],
   "3d": ["webgl", "dom", "perspective", "preserve-3d", "cube", "orb", "sphere"],
@@ -338,8 +339,8 @@ export class ComponentLibraryIndex {
 
     walk(this.componentsDir, null);
 
-    // Display orbs first, then assets, carasols, cubes, then any newly added categories alphabetically
-    const categoryOrder = ["orbs", "assets", "carasols", "cubes"];
+    // Display orbs first, then assets, carasols, cubes, backgrounds, then any newly added categories alphabetically
+    const categoryOrder = ["orbs", "assets", "carasols", "cubes", "backgrounds"];
     found.sort((a, b) => {
       const ia = categoryOrder.indexOf(a.category.toLowerCase());
       const ib = categoryOrder.indexOf(b.category.toLowerCase());

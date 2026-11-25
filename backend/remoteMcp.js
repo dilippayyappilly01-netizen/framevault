@@ -22,7 +22,8 @@ function searchCatalog(catalog, args = {}) {
     if (catFilter) {
       const sec = String(c.section || '').toLowerCase();
       const carouselAlias = catFilter.includes('carousel') && sec.includes('carasol');
-      if (!sec.includes(catFilter) && !carouselAlias) return false;
+      const bgAlias = (catFilter.includes('shader') || catFilter.includes('background')) && sec.includes('background');
+      if (!sec.includes(catFilter) && !carouselAlias && !bgAlias) return false;
     }
     if (engFilter && !String(c.engine || '').toLowerCase().includes(engFilter)) {
       return false;

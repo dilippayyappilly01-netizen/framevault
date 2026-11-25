@@ -46,7 +46,7 @@ server.tool(
     category: z
       .string()
       .optional()
-      .describe("Optional category filter (e.g. 'orbs', 'assets', 'carasols', 'cubes', 'shaders')."),
+      .describe("Optional category filter (e.g. 'orbs', 'assets', 'carasols', 'cubes', 'backgrounds')."),
     engine: z
       .string()
       .optional()

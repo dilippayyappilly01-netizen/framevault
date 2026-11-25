@@ -12,7 +12,7 @@ Use this skill whenever the user asks to build, add, or restyle visual UI elemen
 ### 1. Search Existing Components First (Never Invent From Scratch)
 Before writing any visual UI component from scratch, ALWAYS call the MCP tool **`search_components`** with a concise natural-language `query` describing what the user wants (e.g., `"glowing plasma orb"`, `"3d carousel"`, `"violet particle wave tunnel"`, `"plush fur icon"`, or `"*"` to inspect the full catalog).
 
-- Use optional `category` (`orbs`, `assets`, `carasols`, `cubes`, `shaders`) or `engine` (`WEBGL 3D`, `DOM 3D`, `CANVAS 2D`) filters when narrowing down results.
+- Use optional `category` (`orbs`, `assets`, `carasols`, `cubes`, `backgrounds`) or `engine` (`WEBGL 3D`, `DOM 3D`, `CANVAS 2D`) filters when narrowing down results.
 - Never rewrite, overwrite, or modify the canonical source files inside the component library folder unless the user explicitly asks to edit the library itself.
 
 ### 2. Inspect Shared Guidelines & Target Project Tokens

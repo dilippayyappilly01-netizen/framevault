@@ -1,0 +1,394 @@
+'use client';
+
+/**
+ * Background 099 — Architectural Blueprint Isolines
+ * Converted from FrameVault HTML component to TypeScript + React (.tsx)
+ */
+import React, { useEffect, useRef } from 'react';
+
+export interface Background99Props {
+  /** Additional CSS class names for the root container */
+  className?: string;
+  /** Inline styles applied to the root container */
+  style?: React.CSSProperties;
+  /** Container width (default: '100%') */
+  width?: number | string;
+  /** Container height (default: '100%') */
+  height?: number | string;
+}
+
+const SCOPED_STYLES = `
+.fv-backgrounds-background-99 {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.fv-backgrounds-background-99 *, .fv-backgrounds-background-99 *::before, .fv-backgrounds-background-99 *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  .fv-backgrounds-background-99 {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #0a192f;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .fv-backgrounds-background-99 canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+  }
+`;
+
+// Scoped DOM/Window runtime adapter so WebGL/Canvas/DOM3D logic runs strictly inside this
+// component's container and cleans up all RAF loops & event listeners on React unmount.
+interface ScopedRuntimeContext {
+  root: HTMLDivElement;
+  document: Document;
+  window: Window;
+  requestAnimationFrame: (cb: FrameRequestCallback) => number;
+  cancelAnimationFrame: (id: number) => void;
+}
+
+/* eslint-disable */
+function initBackground99Runtime(__fvRuntime: ScopedRuntimeContext): void {
+  const { document, window, requestAnimationFrame, cancelAnimationFrame } = __fvRuntime as any;
+  (() => {
+    // Interactive topographic contour map with cursor summit deformation and seismic waves (Background 099 — Architectural Blueprint Isolines)
+    const canvas = document.getElementById('glCanvas');
+    const gl = canvas.getContext('webgl2', { antialias: true }) ||
+               canvas.getContext('webgl', { antialias: true });
+    if (!gl) return;
+  
+    const vsSource = `
+      attribute vec2 aPos;
+      varying vec2 vUv;
+      void main() {
+        vUv = aPos * 0.5 + 0.5;
+        gl_Position = vec4(aPos, 0.0, 1.0);
+      }
+    `;
+  
+    const fsSource = `
+      precision highp float;
+      varying vec2 vUv;
+  
+      uniform vec2 uResolution;
+      uniform float uTime;
+      uniform vec2 uPointer;
+      uniform vec2 uVelocity;
+      uniform vec3 uPulse;
+      uniform float uPress;
+      uniform float uZoom;
+  
+  
+      float hash(vec2 p) {
+        p = fract(p * vec2(234.34, 435.345));
+        p += dot(p, p + 34.23);
+        return fract(p.x * p.y);
+      }
+  
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        vec2 u = f * f * (3.0 - 2.0 * f);
+        return mix(
+          mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+          mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+          u.y
+        );
+      }
+  
+      float elev(vec2 p, float t, vec2 ptr, float press, vec2 pulseP, float age) {
+        float h = 0.0;
+        float amp = 0.52;
+        vec2 q = p + 2.59;
+        mat2 m = mat2(0.82, -0.57, 0.57, 0.82);
+        for (int i = 0; i < 4; i++) {
+          h += amp * noise(q + vec2(t * 0.08, -t * 0.06) * float(i + 1));
+          q = m * q * 2.02 + vec2(3.7, 1.9);
+          amp *= 0.48;
+        }
+        float dPtr = length(p - ptr);
+        h += exp(-dPtr * dPtr * 2.1) * mix(0.42, -0.46, press);
+        float wf = length(p - pulseP) - age * 1.8;
+        h += cos(wf * 9.5) * exp(-wf * wf * 5.0) * exp(-age * 1.15) * 0.18;
+        return h;
+      }
+  
+      void main() {
+        float MAP_SCALE = 2.90;
+        float CONTOUR_STEPS = 19.0;
+        float LINE_WEIGHT = 1.00;
+  
+        float aspect = uResolution.x / max(uResolution.y, 1.0);
+        vec2 p = (vUv - 0.5) * vec2(aspect, 1.0) * MAP_SCALE;
+        vec2 ptr = (uPointer - 0.5) * vec2(aspect, 1.0) * MAP_SCALE;
+        vec2 pulseP = (uPulse.xy - 0.5) * vec2(aspect, 1.0) * MAP_SCALE;
+        float age = max(0.0, uTime - uPulse.z);
+  
+        float eps = MAP_SCALE / max(uResolution.y, 1.0);
+        float h = elev(p, uTime, ptr, uPress, pulseP, age);
+        float hx = elev(p + vec2(eps, 0.0), uTime, ptr, uPress, pulseP, age);
+        float hy = elev(p + vec2(0.0, eps), uTime, ptr, uPress, pulseP, age);
+  
+        float grad = max(length(vec2(hx - h, hy - h)), 1e-4);
+        float steps = CONTOUR_STEPS * uZoom;
+        float sH = h * steps;
+  
+        float minorD = abs(fract(sH - 0.5) - 0.5) / (grad * steps);
+        float majorD = abs(fract(sH * 0.2 - 0.5) - 0.5) / (grad * steps * 0.2);
+  
+        float minorL = 1.0 - smoothstep(0.5 * LINE_WEIGHT, 1.65 * LINE_WEIGHT, minorD);
+        float majorL = 1.0 - smoothstep(0.75 * LINE_WEIGHT, 2.2 * LINE_WEIGHT, majorD);
+  
+        vec3 paperBg   = vec3(0.039, 0.098, 0.184);
+        vec3 basinTint = vec3(0.114, 0.306, 0.847);
+        vec3 minorCol  = vec3(0.376, 0.647, 0.980);
+        vec3 majorCol  = vec3(0.749, 0.859, 0.996);
+        vec3 peakCol   = vec3(1.000, 1.000, 1.000);
+  
+        float normH = smoothstep(0.25, 1.15, h);
+        vec3 col = mix(paperBg, basinTint, normH * 0.35);
+        col = mix(col, mix(minorCol, peakCol, normH), minorL * 0.52);
+        col = mix(col, mix(majorCol, peakCol, normH * 0.65), majorL * 0.92);
+  
+        gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+      }
+    `;
+  
+    function compile(type: any, src?: any) {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      return s;
+    }
+  
+    const prog = gl.createProgram();
+    gl.attachShader(prog, compile(gl.VERTEX_SHADER, vsSource));
+    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fsSource));
+    gl.linkProgram(prog);
+    gl.useProgram(prog);
+  
+    const quad = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+      gl.STATIC_DRAW
+    );
+  
+    const aPos = gl.getAttribLocation(prog, 'aPos');
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+  
+    const uResolution = gl.getUniformLocation(prog, 'uResolution');
+    const uTime = gl.getUniformLocation(prog, 'uTime');
+    const uPointer = gl.getUniformLocation(prog, 'uPointer');
+    const uVelocity = gl.getUniformLocation(prog, 'uVelocity');
+    const uPulse = gl.getUniformLocation(prog, 'uPulse');
+    const uPress = gl.getUniformLocation(prog, 'uPress');
+    const uZoom = gl.getUniformLocation(prog, 'uZoom');
+  
+  
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(window.innerWidth * dpr);
+      canvas.height = Math.round(window.innerHeight * dpr);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+  
+    let ptrX = 0.5, ptrY = 0.5;
+    let targetPtrX = 0.5, targetPtrY = 0.5;
+    let velX = 0.0, velY = 0.0;
+    let pulseX = 0.5, pulseY = 0.5, pulseTime = -20.0;
+    let press = 0.0, targetPress = 0.0;
+    let zoom = 1.0, targetZoom = 1.0;
+    let nowSec = 0.0;
+  
+    window.addEventListener('pointermove', (e: any) => {
+      const nx = e.clientX / Math.max(window.innerWidth, 1);
+      const ny = 1.0 - e.clientY / Math.max(window.innerHeight, 1);
+      velX += (nx - targetPtrX) * 0.8;
+      velY += (ny - targetPtrY) * 0.8;
+      targetPtrX = nx;
+      targetPtrY = ny;
+    });
+  
+    window.addEventListener('pointerdown', (e: any) => {
+      targetPress = 1.0;
+      pulseX = e.clientX / Math.max(window.innerWidth, 1);
+      pulseY = 1.0 - e.clientY / Math.max(window.innerHeight, 1);
+      pulseTime = nowSec;
+    });
+  
+    window.addEventListener('pointerup', () => {
+      targetPress = 0.0;
+    });
+  
+    window.addEventListener('pointerleave', () => {
+      targetPress = 0.0;
+    });
+  
+    window.addEventListener('wheel', (e: any) => {
+      targetZoom = Math.max(0.6, Math.min(1.75, targetZoom + e.deltaY * 0.0005));
+    }, { passive: true });
+  
+    function render(now?: any) {
+      const t = now * 0.001;
+      nowSec = t;
+  
+      ptrX += (targetPtrX - ptrX) * 0.08;
+      ptrY += (targetPtrY - ptrY) * 0.08;
+      velX *= 0.90;
+      velY *= 0.90;
+      press += (targetPress - press) * 0.09;
+      zoom += (targetZoom - zoom) * 0.08;
+  
+      gl.uniform2f(uResolution, canvas.width, canvas.height);
+      gl.uniform1f(uTime, t);
+      gl.uniform2f(uPointer, ptrX, ptrY);
+      gl.uniform2f(uVelocity, velX, velY);
+      gl.uniform3f(uPulse, pulseX, pulseY, pulseTime);
+      gl.uniform1f(uPress, press);
+      gl.uniform1f(uZoom, zoom);
+  
+  
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      requestAnimationFrame(render);
+    }
+  
+    requestAnimationFrame(render);
+  })();
+}
+/* eslint-enable */
+
+export function Background99({ className, style, width = '100%', height = '100%' }: Background99Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root) return;
+
+    let disposed = false;
+    const rafIds = new Set<number>();
+    const cleanups: Array<() => void> = [];
+    const resizeCallbacks = new Set<() => void>();
+
+    const scopedRaf = (cb: FrameRequestCallback): number => {
+      if (disposed) return 0;
+      const id = window.requestAnimationFrame((ts: number) => {
+        rafIds.delete(id);
+        if (!disposed) cb(ts);
+      });
+      rafIds.add(id);
+      return id;
+    };
+
+    const scopedCaf = (id: number): void => {
+      rafIds.delete(id);
+      window.cancelAnimationFrame(id);
+    };
+
+    const scopedDoc = new Proxy(document, {
+      get(target, prop) {
+        if (prop === 'body' || prop === 'documentElement') return root;
+        if (prop === 'getElementById') {
+          return (id: string) =>
+            root.querySelector(`#${CSS.escape(id)}`) || target.getElementById(id);
+        }
+        if (prop === 'querySelector') {
+          return (sel: string) => root.querySelector(sel);
+        }
+        if (prop === 'querySelectorAll') {
+          return (sel: string) => root.querySelectorAll(sel);
+        }
+        if (prop === 'addEventListener') {
+          return (type: string, listener: EventListenerOrEventListenerObject, opts?: boolean | AddEventListenerOptions) => {
+            target.addEventListener(type, listener, opts);
+            cleanups.push(() => target.removeEventListener(type, listener, opts));
+          };
+        }
+        const val = Reflect.get(target, prop);
+        return typeof val === 'function' ? val.bind(target) : val;
+      }
+    }) as Document;
+
+    const scopedWin = new Proxy(window, {
+      get(target, prop) {
+        if (prop === 'innerWidth') return root.clientWidth || target.innerWidth;
+        if (prop === 'innerHeight') return root.clientHeight || target.innerHeight;
+        if (prop === 'requestAnimationFrame') return scopedRaf;
+        if (prop === 'cancelAnimationFrame') return scopedCaf;
+        if (prop === 'addEventListener') {
+          return (type: string, listener: EventListenerOrEventListenerObject, opts?: boolean | AddEventListenerOptions) => {
+            if (type === 'resize' && typeof listener === 'function') {
+              resizeCallbacks.add(listener as () => void);
+            }
+            const host: EventTarget =
+              type === 'pointerdown' || type === 'mousedown' || type === 'touchstart' || type === 'wheel'
+                ? root
+                : target;
+            host.addEventListener(type, listener, opts);
+            cleanups.push(() => host.removeEventListener(type, listener, opts));
+          };
+        }
+        const val = Reflect.get(target, prop);
+        return typeof val === 'function' ? val.bind(target) : val;
+      }
+    }) as Window;
+
+    const ro = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => {
+          if (disposed) return;
+          resizeCallbacks.forEach(fn => {
+            try { fn(); } catch { /* ignore */ }
+          });
+        })
+      : null;
+    ro?.observe(root);
+
+    initBackground99Runtime({
+      root,
+      document: scopedDoc,
+      window: scopedWin,
+      requestAnimationFrame: scopedRaf,
+      cancelAnimationFrame: scopedCaf
+    });
+
+    return () => {
+      disposed = true;
+      ro?.disconnect();
+      resizeCallbacks.clear();
+      rafIds.forEach(id => window.cancelAnimationFrame(id));
+      rafIds.clear();
+      cleanups.forEach(fn => {
+        try { fn(); } catch { /* ignore */ }
+      });
+      cleanups.length = 0;
+    };
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      className={className ? `fv-backgrounds-background-99 ${className}` : 'fv-backgrounds-background-99'}
+      style={{ width, height, ...style }}
+    >
+      <style dangerouslySetInnerHTML={{ __html: SCOPED_STYLES }} />
+        <canvas id="glCanvas"></canvas>
+    </div>
+  );
+}
+
+export default Background99;

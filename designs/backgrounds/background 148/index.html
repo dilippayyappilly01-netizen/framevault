@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background 148 — Arctic Mint Elastic Dot Grid</title>
+<style>
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #f0fdfa;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<canvas id="stageCanvas"></canvas>
+
+<script>
+(() => {
+  // Elastic magnetic dot vector field aligning smoothly to pointer velocity with click shockwaves
+  const canvas = document.getElementById('stageCanvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const BG_HEX = '#f0fdfa';
+  const BASE_HEX = '#99f6e4';
+  const ACCENT_A = '#0d9488';
+  const ACCENT_B = '#0284c7';
+
+  function parseHex(h) {
+    const c = h.replace('#', '');
+    return [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)];
+  }
+  const baseRgb = parseHex(BASE_HEX);
+  const rgbA = parseHex(ACCENT_A);
+  const rgbB = parseHex(ACCENT_B);
+
+  let width = 0, height = 0, dpr = 1;
+  let nodes = [];
+  const shocks = [];
+
+  function build() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const sp = Math.max(24, Math.min(38, Math.round(Math.min(width, height) / 20)));
+    const cols = Math.ceil(width / sp) + 2;
+    const rows = Math.ceil(height / sp) + 2;
+    const ox = (width - (cols - 1) * sp) * 0.5;
+    const oy = (height - (rows - 1) * sp) * 0.5;
+    nodes = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        nodes.push({ hx: ox + c * sp, hy: oy + r * sp, x: ox + c * sp, y: oy + r * sp, vx: 0, vy: 0, ang: 0, e: 0 });
+      }
+    }
+  }
+  window.addEventListener('resize', build);
+  build();
+
+  let ptrX = -9999, ptrY = -9999, isHold = false, radiusScale = 1.0;
+  window.addEventListener('pointermove', (e) => { ptrX = e.clientX; ptrY = e.clientY; });
+  window.addEventListener('pointerleave', () => { ptrX = -9999; ptrY = -9999; isHold = false; });
+  window.addEventListener('pointerdown', (e) => {
+    isHold = true;
+    shocks.push({ x: e.clientX, y: e.clientY, r: 0, a: 1.0 });
+    if (shocks.length > 5) shocks.shift();
+  });
+  window.addEventListener('pointerup', () => { isHold = false; });
+  window.addEventListener('wheel', (e) => {
+    radiusScale = Math.max(0.55, Math.min(1.8, radiusScale - e.deltaY * 0.0005));
+  }, { passive: true });
+
+  function animate(now) {
+    const t = now * 0.001 + 3.07;
+    const speedMult = 1.0;
+
+    ctx.fillStyle = BG_HEX;
+    ctx.fillRect(0, 0, width, height);
+
+    for (let s = shocks.length - 1; s >= 0; s--) {
+      shocks[s].r += 8.0 * speedMult;
+      shocks[s].a *= 0.962;
+      if (shocks[s].a < 0.02) shocks.splice(s, 1);
+    }
+
+    const R = 190 * radiusScale;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      const wx = Math.sin(n.hy * 0.012 + t * 1.4) * 4.0;
+      const wy = Math.cos(n.hx * 0.012 - t * 1.2) * 4.0;
+      let fx = (n.hx + wx - n.x) * 0.09;
+      let fy = (n.hy + wy - n.y) * 0.09;
+      let targetAng = Math.sin(n.hx * 0.008 + n.hy * 0.008 + t) * 1.2;
+      let localE = 0;
+
+      if (ptrX > -9000) {
+        const dx = ptrX - n.x;
+        const dy = ptrY - n.y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d < R) {
+          const inf = 1 - d / R;
+          const sm = inf * inf;
+          const sign = isHold ? 0.85 : -1.0;
+          fx += (dx / d) * sm * 3.8 * sign;
+          fy += (dy / d) * sm * 3.8 * sign;
+          targetAng = Math.atan2(dy, dx);
+          localE = Math.max(localE, sm);
+        }
+      }
+
+      for (let s = 0; s < shocks.length; s++) {
+        const sd = Math.hypot(n.x - shocks[s].x, n.y - shocks[s].y) || 1;
+        const band = Math.abs(sd - shocks[s].r);
+        if (band < 48) {
+          const p = (1 - band / 48) * shocks[s].a;
+          fx += ((n.x - shocks[s].x) / sd) * p * 5.0;
+          fy += ((n.y - shocks[s].y) / sd) * p * 5.0;
+          localE = Math.max(localE, p);
+        }
+      }
+
+      n.vx = (n.vx + fx) * 0.84;
+      n.vy = (n.vy + fy) * 0.84;
+      n.x += n.vx;
+      n.y += n.vy;
+      n.ang += (targetAng - n.ang) * 0.16;
+      n.e += (localE - n.e) * 0.18;
+
+      const mix = Math.min(1, n.e * 1.3);
+      const tCol = 0.5 + 0.5 * Math.sin(n.hx * 0.01 + t * 1.5);
+      const ar = rgbA[0] + (rgbB[0] - rgbA[0]) * tCol;
+      const ag = rgbA[1] + (rgbB[1] - rgbA[1]) * tCol;
+      const ab = rgbA[2] + (rgbB[2] - rgbA[2]) * tCol;
+      const cr = Math.round(baseRgb[0] + (ar - baseRgb[0]) * mix);
+      const cg = Math.round(baseRgb[1] + (ag - baseRgb[1]) * mix);
+      const cb = Math.round(baseRgb[2] + (ab - baseRgb[2]) * mix);
+      const alpha = 0.45 + n.e * 0.55;
+
+      
+      ctx.fillStyle = `rgba(${cr},${cg},${cb},${alpha.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, 1.8 + n.e * 3.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

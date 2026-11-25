@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background 027 — Obsidian Cyan Isometric Hex Wave</title>
+<style>
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #050811;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<canvas id="stageCanvas"></canvas>
+
+<script>
+(() => {
+  // Isometric 3D-shaded hexagonal wave field lifting beneath the cursor with click ripples
+  const canvas = document.getElementById('stageCanvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const BG_HEX = '#050811';
+  const TOP_HEX = '#111827';
+  const LEFT_HEX = '#090f1d';
+  const RIGHT_HEX = '#1e293b';
+  const ACCENT_HEX = '#22d3ee';
+
+  function hexRgb(h) {
+    const s = h.replace('#', '');
+    return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16)];
+  }
+  const topRgb = hexRgb(TOP_HEX);
+  const accRgb = hexRgb(ACCENT_HEX);
+
+  let width = 0, height = 0, dpr = 1;
+  let hexR = 28;
+  let tiles = [];
+  const ripples = [];
+
+  function build() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    width = window.innerWidth;
+    height = window.innerHeight;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const dx = hexR * 1.82;
+    const dy = hexR * 1.12;
+    const cols = Math.ceil(width / dx) + 3;
+    const rows = Math.ceil(height / dy) + 4;
+    tiles = [];
+    for (let r = -1; r < rows; r++) {
+      for (let c = -1; c < cols; c++) {
+        tiles.push({
+          x: c * dx + (r % 2 !== 0 ? dx * 0.5 : 0),
+          y: r * dy,
+          h: 0
+        });
+      }
+    }
+  }
+  window.addEventListener('resize', build);
+  build();
+
+  let ptrX = -9999, ptrY = -9999, liftScale = 1.0;
+
+  window.addEventListener('pointermove', (e) => { ptrX = e.clientX; ptrY = e.clientY; });
+  window.addEventListener('pointerleave', () => { ptrX = -9999; ptrY = -9999; });
+  window.addEventListener('pointerdown', (e) => {
+    ripples.push({ x: e.clientX, y: e.clientY, r: 0, a: 1.0 });
+    if (ripples.length > 4) ripples.shift();
+  });
+  window.addEventListener('wheel', (e) => {
+    liftScale = Math.max(0.5, Math.min(1.8, liftScale - e.deltaY * 0.0006));
+  }, { passive: true });
+
+  function drawHexPillar(cx, cy, r, elev, glow) {
+    const yTop = cy - elev;
+    const rx = r * 0.92;
+    const ry = r * 0.56;
+    const pts = [];
+    for (let k = 0; k < 6; k++) {
+      const a = (Math.PI / 3) * k + Math.PI / 6;
+      pts.push([cx + Math.cos(a) * rx, yTop + Math.sin(a) * ry]);
+    }
+    const depth = Math.max(6, elev + 12);
+
+    // Left extruded wall
+    ctx.fillStyle = LEFT_HEX;
+    ctx.beginPath();
+    ctx.moveTo(pts[1][0], pts[1][1]);
+    ctx.lineTo(pts[2][0], pts[2][1]);
+    ctx.lineTo(pts[2][0], pts[2][1] + depth);
+    ctx.lineTo(pts[1][0], pts[1][1] + depth);
+    ctx.closePath();
+    ctx.fill();
+
+    // Right extruded wall
+    ctx.fillStyle = RIGHT_HEX;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    ctx.lineTo(pts[1][0], pts[1][1]);
+    ctx.lineTo(pts[1][0], pts[1][1] + depth);
+    ctx.lineTo(pts[0][0], pts[0][1] + depth);
+    ctx.closePath();
+    ctx.fill();
+
+    // Top face interpolated toward accent glow
+    const m = Math.max(0, Math.min(1, glow));
+    const tr = Math.round(topRgb[0] + (accRgb[0] - topRgb[0]) * m);
+    const tg = Math.round(topRgb[1] + (accRgb[1] - topRgb[1]) * m);
+    const tb = Math.round(topRgb[2] + (accRgb[2] - topRgb[2]) * m);
+    ctx.fillStyle = `rgb(${tr},${tg},${tb})`;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let k = 1; k < 6; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function animate(now) {
+    const t = now * 0.001 + 4.29;
+    const speedMult = 1.0;
+
+    ctx.fillStyle = BG_HEX;
+    ctx.fillRect(0, 0, width, height);
+
+    for (let i = ripples.length - 1; i >= 0; i--) {
+      ripples[i].r += 7.5 * speedMult;
+      ripples[i].a *= 0.96;
+      if (ripples[i].a < 0.02) ripples.splice(i, 1);
+    }
+
+    for (let i = 0; i < tiles.length; i++) {
+      const tile = tiles[i];
+      let targetH = (Math.sin(tile.x * 0.011 + t * 1.45) * Math.cos(tile.y * 0.013 - t * 1.15) * 0.5 + 0.5) * 22 * liftScale;
+      let glow = targetH / 38;
+
+      if (ptrX > -9000) {
+        const d = Math.hypot(tile.x - ptrX, tile.y - ptrY);
+        if (d < 190) {
+          const inf = 1 - d / 190;
+          const s = inf * inf;
+          targetH += s * 36 * liftScale;
+          glow += s * 0.9;
+        }
+      }
+
+      for (let r = 0; r < ripples.length; r++) {
+        const rd = Math.hypot(tile.x - ripples[r].x, tile.y - ripples[r].y);
+        const band = Math.abs(rd - ripples[r].r);
+        if (band < 55) {
+          const p = (1 - band / 55) * ripples[r].a;
+          targetH += p * 34;
+          glow += p * 0.85;
+        }
+      }
+
+      tile.h += (targetH - tile.h) * 0.14;
+      drawHexPillar(tile.x, tile.y, hexR, tile.h, glow);
+    }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>
