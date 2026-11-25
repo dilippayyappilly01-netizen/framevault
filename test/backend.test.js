@@ -1017,3 +1017,64 @@ test('Turso cloud SQLite sync persists licenses & revocations across ephemeral R
     cloudDb.close();
   }
 });
+
+test('OWNER_LICENSE_KEY unlocks all paid features in production without exposing the raw secret', async () => {
+  const secretOwnerKey = 'FV-OWNER-PRIVATE-TEST-2026';
+  const srv = await startTestServer({
+    NODE_ENV: 'production',
+    OWNER_LICENSE_KEY: secretOwnerKey,
+    RAZORPAY_KEY_ID: 'rzp_live_dummy',
+    RAZORPAY_KEY_SECRET: 'rzp_secret_dummy'
+  });
+  try {
+    // Wrong key stays rejected
+    const badRes = await request(srv.baseUrl, '/api/license/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey: 'WRONG-OWNER-KEY-999' })
+    });
+    assert.equal(badRes.status, 400);
+
+    // Valid owner key unlocks via /api/license/restore and masks key in response
+    const unlockRes = await request(srv.baseUrl, '/api/license/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ licenseKey: secretOwnerKey })
+    });
+    assert.equal(unlockRes.status, 200);
+    assert.equal(unlockRes.json.unlocked, true);
+    assert.equal(unlockRes.json.licenseKey, 'OWNER-ACCESS');
+    assert.equal(unlockRes.json.method, 'owner-key');
+
+    const cookie = extractCookie(unlockRes.headers['set-cookie']);
+    assert.ok(cookie.startsWith('ok_access='));
+
+    // /api/access-status confirms unlocked & masked key
+    const statusRes = await request(srv.baseUrl, '/api/access-status', {
+      headers: { Cookie: cookie }
+    });
+    assert.equal(statusRes.status, 200);
+    assert.equal(statusRes.json.unlocked, true);
+    assert.equal(statusRes.json.licenseKey, 'OWNER-ACCESS');
+
+    // Paid /api/source endpoint succeeds with owner cookie
+    const srcRes = await request(srv.baseUrl, '/api/source', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ id: 'backgrounds__background-151', format: 'html' })
+    });
+    assert.equal(srcRes.status, 200);
+    assert.ok(srcRes.json.code.includes('Background 151'));
+
+    // Remote MCP Bearer auth also accepts owner key
+    const mcpRes = await request(srv.baseUrl, '/api/mcp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secretOwnerKey}` },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' })
+    });
+    assert.equal(mcpRes.status, 200);
+    assert.ok(Array.isArray(mcpRes.json.result?.tools));
+  } finally {
+    await srv.close();
+  }
+});

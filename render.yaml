@@ -25,6 +25,8 @@ services:
         value: $4.99
       - key: ORIGINKIT_SECRET
         generateValue: true
+      - key: OWNER_LICENSE_KEY
+        sync: false
       - key: PUBLIC_URL
         sync: false
       - key: TURSO_DATABASE_URL

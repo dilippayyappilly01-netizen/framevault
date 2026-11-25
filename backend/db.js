@@ -251,8 +251,31 @@ function createDatabase(config) {
     throw new Error('Failed to issue license');
   }
 
+  function isOwnerKeyMatch(candidate) {
+    const configured = String(config.ownerLicenseKey || '').trim();
+    if (configured.length < 12) return false;
+    const raw = String(candidate || '').trim();
+    const a = Buffer.from(raw, 'utf8');
+    const b = Buffer.from(configured, 'utf8');
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  }
+
   function findActiveLicenseByKey(licenseKey) {
     if (!licenseKey) return null;
+    if (isOwnerKeyMatch(licenseKey)) {
+      return {
+        id: 0,
+        licenseKey: config.ownerLicenseKey,
+        displayKey: 'OWNER-ACCESS',
+        email: 'owner@framevault.dev',
+        method: 'owner-key',
+        active: true,
+        isOwner: true,
+        amountCents: 0,
+        currency: config.licenseCurrency,
+        createdAt: new Date(0).toISOString()
+      };
+    }
     const row = stmtFindByKey.get(String(licenseKey).trim());
     if (!row || !row.active) return null;
     return mapLicenseRow(row);

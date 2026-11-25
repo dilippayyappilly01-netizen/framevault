@@ -324,7 +324,7 @@ function createAppServer(configOverrides = {}, deps = {}) {
         razorpayConfigured: config.razorpayConfigured,
         demoCheckoutEnabled: config.demoCheckoutEnabled,
         emailConfigured: Boolean(config.resendApiKey),
-        licenseKey: license ? license.licenseKey : null,
+        licenseKey: license ? (license.displayKey || license.licenseKey) : null,
         email: license ? license.email : null,
         method: license ? license.method : null
       }, headers);
@@ -701,7 +701,8 @@ function createAppServer(configOverrides = {}, deps = {}) {
       }
 
       const email = String(body.email || '').trim().toLowerCase();
-      const licenseKey = String(body.licenseKey || '').trim().toUpperCase();
+      const rawKey = String(body.licenseKey || '').trim();
+      const licenseKey = rawKey.toUpperCase();
       const wantsResend = Boolean(body.resend);
 
       if (wantsResend) {
@@ -722,6 +723,18 @@ function createAppServer(configOverrides = {}, deps = {}) {
           sent: true,
           message: 'If an active license exists for that email, we sent your license key.'
         });
+      }
+
+      // Check private owner unlock key (OWNER_LICENSE_KEY env var, >= 12 chars)
+      const ownerLicense = rawKey ? db.findActiveLicenseByKey(rawKey) : null;
+      if (ownerLicense && ownerLicense.isOwner) {
+        const cookie = buildAccessCookieHeader(ownerLicense.licenseKey, req, config, db.signingSecret);
+        return sendJson(req, res, config, 200, {
+          unlocked: true,
+          licenseKey: ownerLicense.displayKey || 'OWNER-ACCESS',
+          email: ownerLicense.email,
+          method: ownerLicense.method
+        }, { 'Set-Cookie': cookie });
       }
 
       if (!licenseKey || !/^OK-PRO-[A-Z0-9-]{8,32}$/.test(licenseKey)) {

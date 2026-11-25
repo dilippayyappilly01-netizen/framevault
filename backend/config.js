@@ -101,6 +101,7 @@ function createConfig(rootDir, overrides = {}) {
     demoCheckoutEnabled,
     cookieSecure,
     signingSecretEnv: String(env.ORIGINKIT_SECRET || '').trim(),
+    ownerLicenseKey: String(env.OWNER_LICENSE_KEY || '').trim(),
     licenseCurrency,
     licensePriceCents,
     licensePriceDisplay,
