@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background 205 — Double Pendulum Chaos Ribbons</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #06050a; user-select: none; -webkit-font-smoothing: antialiased; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="stageCanvas"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById('stageCanvas');
+  const ctx = canvas.getContext('2d'); if (!ctx) return;
+  let w = 0, h = 0, dpr = 1;
+  const pends = [
+    { a1: 2.1, a2: 1.8, v1: 0, v2: 0, col: '#ec4899' },
+    { a1: 2.11, a2: 1.81, v1: 0, v2: 0, col: '#38bdf8' },
+    { a1: 2.12, a2: 1.82, v1: 0, v2: 0, col: '#a855f7' }
+  ];
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#06050a'; ctx.fillRect(0, 0, w, h);
+  }
+  window.addEventListener('resize', resize); resize();
+  window.addEventListener('pointerdown', () => {
+    for (let i = 0; i < pends.length; i++) { pends[i].v1 += (Math.random() - 0.5) * 0.08; pends[i].v2 += (Math.random() - 0.5) * 0.1; }
+  });
+  function animate() {
+    ctx.fillStyle = 'rgba(6, 5, 10, 0.045)'; ctx.fillRect(0, 0, w, h);
+    const L = Math.min(w, h) * 0.21, g = 0.008;
+    for (let i = 0; i < pends.length; i++) {
+      const p = pends[i];
+      const ox = w * 0.5 + L * (Math.sin(p.a1) + Math.sin(p.a2));
+      const oy = h * 0.45 + L * (Math.cos(p.a1) + Math.cos(p.a2));
+      const da = p.a1 - p.a2;
+      const den = 3 - Math.cos(2 * da);
+      const acc1 = (-3 * g * Math.sin(p.a1) - g * Math.sin(p.a1 - 2 * p.a2) - 2 * Math.sin(da) * (p.v2 * p.v2 + p.v1 * p.v1 * Math.cos(da))) / den;
+      const acc2 = (2 * Math.sin(da) * (2 * p.v1 * p.v1 + 2 * g * Math.cos(p.a1) + p.v2 * p.v2 * Math.cos(da))) / den;
+      p.v1 = (p.v1 + acc1) * 0.9995; p.v2 = (p.v2 + acc2) * 0.9995;
+      p.a1 += p.v1; p.a2 += p.v2;
+      const nx = w * 0.5 + L * (Math.sin(p.a1) + Math.sin(p.a2));
+      const ny = h * 0.45 + L * (Math.cos(p.a1) + Math.cos(p.a2));
+      ctx.strokeStyle = p.col; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(nx, ny); ctx.stroke();
+    }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

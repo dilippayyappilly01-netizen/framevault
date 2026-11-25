@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background 181 — Chromatic Glass Prism Dispersion</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #050508; user-select: none; -webkit-font-smoothing: antialiased; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="glCanvas"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById('glCanvas');
+  const gl = canvas.getContext('webgl2', { antialias: true }) || canvas.getContext('webgl', { antialias: true });
+  if (!gl) return;
+
+  const vsSource = `
+    attribute vec2 aPos;
+    varying vec2 vUv;
+    void main() {
+      vUv = aPos * 0.5 + 0.5;
+      gl_Position = vec4(aPos, 0.0, 1.0);
+    }
+  `;
+
+  const fsSource = `
+    precision highp float;
+    varying vec2 vUv;
+    uniform vec2 uResolution;
+    uniform float uTime;
+    uniform vec2 uPointer;
+    uniform vec2 uVelocity;
+    uniform vec3 uPulse;
+    uniform float uPress;
+    uniform float uZoom;
+
+    float sdEquilateralTriangle(vec2 p, float r) {
+      const float k = 1.7320508;
+      p.x = abs(p.x) - r;
+      p.y = p.y + r / k;
+      if (p.x + k * p.y > 0.0) p = vec2(p.x - k * p.y, -k * p.x - p.y) / 2.0;
+      p.x -= clamp(p.x, -2.0 * r, 0.0);
+      return -length(p) * sign(p.y);
+    }
+    void main() {
+      float aspect = uResolution.x / max(uResolution.y, 1.0);
+      vec2 p = (vUv - 0.5) * vec2(aspect, 1.0);
+      vec2 ptr = (uPointer - 0.5) * vec2(aspect, 1.0);
+      float tri = sdEquilateralTriangle(p, 0.24 * uZoom);
+      float edge = exp(-abs(tri) * 90.0);
+      float slope = (ptr.y * 0.55) - 0.08;
+      float inBeam = step(p.x, -0.02) * exp(-abs(p.y - (p.x * slope - 0.02)) * 55.0);
+      vec3 spec = vec3(0.0);
+      if (p.x > -0.02) {
+        for (int i = 0; i < 6; i++) {
+          float fi = float(i) / 5.0;
+          float ang = -slope * 0.6 - (fi - 0.5) * (0.42 + uPress * 0.25) + sin(uTime * 0.6) * 0.04;
+          float d = abs(p.y - (p.x * ang - 0.02));
+          float band = exp(-d * (38.0 - p.x * 22.0)) * smoothstep(0.0, 0.14, p.x);
+          vec3 rgb = 0.5 + 0.5 * cos(fi * 5.2 + vec3(0.0, 2.094, 4.188));
+          spec += rgb * band * 0.65;
+        }
+      }
+      vec3 col = vec3(0.02, 0.022, 0.032) + vec3(0.95, 0.97, 1.0) * inBeam * 1.1 + spec;
+      col += vec3(0.75, 0.88, 1.0) * edge * 0.85 + vec3(0.18, 0.26, 0.42) * step(tri, 0.0) * 0.25;
+      gl_FragColor = vec4(1.0 - exp(-col * 1.15), 1.0);
+    }
+  `;
+
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, vsSource));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fsSource));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+
+  const quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+  const aPos = gl.getAttribLocation(prog, 'aPos');
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  const uResolution = gl.getUniformLocation(prog, 'uResolution');
+  const uTime = gl.getUniformLocation(prog, 'uTime');
+  const uPointer = gl.getUniformLocation(prog, 'uPointer');
+  const uVelocity = gl.getUniformLocation(prog, 'uVelocity');
+  const uPulse = gl.getUniformLocation(prog, 'uPulse');
+  const uPress = gl.getUniformLocation(prog, 'uPress');
+  const uZoom = gl.getUniformLocation(prog, 'uZoom');
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(window.innerWidth * dpr);
+    canvas.height = Math.round(window.innerHeight * dpr);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  let ptrX = 0.5, ptrY = 0.5, tPtrX = 0.5, tPtrY = 0.5;
+  let velX = 0.0, velY = 0.0;
+  let pulseX = 0.5, pulseY = 0.5, pulseT = -20.0;
+  let press = 0.0, tPress = 0.0;
+  let zoom = 1.0, tZoom = 1.0, nowSec = 0.0;
+
+  window.addEventListener('pointermove', (e) => {
+    const nx = e.clientX / Math.max(window.innerWidth, 1);
+    const ny = 1.0 - e.clientY / Math.max(window.innerHeight, 1);
+    velX += (nx - tPtrX) * 0.8;
+    velY += (ny - tPtrY) * 0.8;
+    tPtrX = nx; tPtrY = ny;
+  });
+  window.addEventListener('pointerdown', (e) => {
+    tPress = 1.0;
+    pulseX = e.clientX / Math.max(window.innerWidth, 1);
+    pulseY = 1.0 - e.clientY / Math.max(window.innerHeight, 1);
+    pulseT = nowSec;
+  });
+  window.addEventListener('pointerup', () => { tPress = 0.0; });
+  window.addEventListener('pointerleave', () => { tPress = 0.0; });
+  window.addEventListener('wheel', (e) => {
+    tZoom = Math.max(0.6, Math.min(1.75, tZoom + e.deltaY * 0.0005));
+  }, { passive: true });
+
+  function render(now) {
+    const t = now * 0.001;
+    nowSec = t;
+    ptrX += (tPtrX - ptrX) * 0.085;
+    ptrY += (tPtrY - ptrY) * 0.085;
+    velX *= 0.90; velY *= 0.90;
+    press += (tPress - press) * 0.09;
+    zoom += (tZoom - zoom) * 0.08;
+
+    gl.uniform2f(uResolution, canvas.width, canvas.height);
+    gl.uniform1f(uTime, t);
+    gl.uniform2f(uPointer, ptrX, ptrY);
+    gl.uniform2f(uVelocity, velX, velY);
+    gl.uniform3f(uPulse, pulseX, pulseY, pulseT);
+    gl.uniform1f(uPress, press);
+    gl.uniform1f(uZoom, zoom);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>

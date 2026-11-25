@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background 212 — Kinetic Swiss Numeral Grid</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0b0d; user-select: none; -webkit-font-smoothing: antialiased; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="stageCanvas"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById('stageCanvas');
+  const ctx = canvas.getContext('2d'); if (!ctx) return;
+  let w = 0, h = 0, dpr = 1, ptrX = -999, ptrY = -999;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize); resize();
+  window.addEventListener('pointermove', (e) => { ptrX = e.clientX; ptrY = e.clientY; });
+  function animate(now) {
+    const t = now * 0.001;
+    ctx.fillStyle = '#0b0b0d'; ctx.fillRect(0, 0, w, h);
+    const sp = 48; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    let idx = 0;
+    for (let y = sp * 0.5; y < h; y += sp) {
+      for (let x = sp * 0.5; x < w; x += sp) {
+        const d = Math.hypot(x - ptrX, y - ptrY);
+        const boost = Math.exp(-d * d / 28000);
+        const sz = Math.round(12 + boost * 22 + (0.5 + 0.5 * Math.sin(x * 0.01 + t * 1.5)) * 6);
+        ctx.font = `700 ${sz}px system-ui, sans-serif`;
+        ctx.fillStyle = boost > 0.2 ? `rgba(244, 114, 182, ${(0.35 + boost * 0.65).toFixed(2)})` : 'rgba(228, 228, 231, 0.22)';
+        ctx.fillText(String((idx++ + Math.floor(t)) % 10), x, y);
+      }
+    }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

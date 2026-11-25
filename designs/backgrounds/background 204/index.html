@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background 204 — Deformable Spring Silk Cloth Mesh</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #070910; user-select: none; -webkit-font-smoothing: antialiased; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="stageCanvas"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById('stageCanvas');
+  const ctx = canvas.getContext('2d'); if (!ctx) return;
+  let w = 0, h = 0, dpr = 1, cols = 28, rows = 18, pts = [];
+  let ptrX = -999, ptrY = -999, down = false;
+  function build() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    pts = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const x = (c / (cols - 1)) * w, y = (r / (rows - 1)) * h;
+      pts.push({ hx: x, hy: y, x, y, vx: 0, vy: 0 });
+    }
+  }
+  window.addEventListener('resize', build); build();
+  window.addEventListener('pointermove', (e) => { ptrX = e.clientX; ptrY = e.clientY; });
+  window.addEventListener('pointerdown', () => { down = true; });
+  window.addEventListener('pointerup', () => { down = false; });
+  window.addEventListener('pointerleave', () => { ptrX = -999; ptrY = -999; down = false; });
+  function animate(now) {
+    const t = now * 0.001;
+    ctx.fillStyle = '#070910'; ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      const windX = Math.sin(p.hy * 0.012 + t * 1.6) * 10;
+      const windY = Math.cos(p.hx * 0.012 - t * 1.3) * 10;
+      p.vx += (p.hx + windX - p.x) * 0.06;
+      p.vy += (p.hy + windY - p.y) * 0.06;
+      const dx = p.x - ptrX, dy = p.y - ptrY, d = Math.hypot(dx, dy);
+      if (d < 160 && d > 1) {
+        const f = (1 - d / 160) * (down ? -6.5 : 4.2);
+        p.vx += (dx / d) * f; p.vy += (dy / d) * f;
+      }
+      p.vx *= 0.85; p.vy *= 0.85; p.x += p.vx; p.y += p.vy;
+    }
+    ctx.strokeStyle = 'rgba(129, 140, 248, 0.35)'; ctx.lineWidth = 1;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const p = pts[r * cols + c];
+      if (c + 1 < cols) { const q = pts[r * cols + c + 1]; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke(); }
+      if (r + 1 < rows) { const q = pts[(r + 1) * cols + c]; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke(); }
+    }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

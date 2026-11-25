@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background 220 — Editorial Watercolor Ink Diffusion</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #f8f5ef; user-select: none; -webkit-font-smoothing: antialiased; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="stageCanvas"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById('stageCanvas');
+  const ctx = canvas.getContext('2d'); if (!ctx) return;
+  let w = 0, h = 0, dpr = 1, last = 0;
+  const blooms = [];
+  const COLS = ['37,99,235', '219,39,119', '13,148,136', '234,88,12', '124,58,237'];
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize); resize();
+  function drop(x, y) { blooms.push({ x, y, r: 12, maxR: 120 + Math.random() * 140, a: 0.24, col: COLS[Math.floor(Math.random() * COLS.length)] }); if (blooms.length > 24) blooms.shift(); }
+  window.addEventListener('pointerdown', (e) => { drop(e.clientX, e.clientY); });
+  window.addEventListener('pointermove', (e) => { if (Math.random() > 0.92) drop(e.clientX, e.clientY); });
+  function animate(now) {
+    ctx.fillStyle = '#f8f5ef'; ctx.fillRect(0, 0, w, h);
+    if (now - last > 1200) { last = now; drop(Math.random() * w, Math.random() * h); }
+    for (let i = blooms.length - 1; i >= 0; i--) {
+      const b = blooms[i]; b.r += (b.maxR - b.r) * 0.025; b.a *= 0.992;
+      if (b.a < 0.008) { blooms.splice(i, 1); continue; }
+      const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+      g.addColorStop(0, `rgba(${b.col}, ${b.a.toFixed(3)})`);
+      g.addColorStop(0.7, `rgba(${b.col}, ${(b.a * 0.65).toFixed(3)})`);
+      g.addColorStop(1, `rgba(${b.col}, 0)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+    }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

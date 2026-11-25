@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background 156 — Radial Radar Sonar Sweep</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #030b0a; user-select: none; -webkit-font-smoothing: antialiased; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
+</style>
+</head>
+<body>
+<canvas id="stageCanvas"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById('stageCanvas');
+  const ctx = canvas.getContext('2d'); if (!ctx) return;
+  let w = 0, h = 0, dpr = 1, cx = 0, cy = 0, tcx = 0, tcy = 0;
+  const blips = [];
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cx = tcx = w * 0.5; cy = tcy = h * 0.5;
+    if (!blips.length) for (let i = 0; i < 24; i++) blips.push({ a: Math.random() * 6.283, r: 0.12 + Math.random() * 0.42, glow: 0 });
+  }
+  window.addEventListener('resize', resize); resize();
+  window.addEventListener('pointermove', (e) => { tcx = w * 0.5 + (e.clientX - w * 0.5) * 0.25; tcy = h * 0.5 + (e.clientY - h * 0.5) * 0.25; });
+  window.addEventListener('pointerdown', (e) => {
+    const a = Math.atan2(e.clientY - cy, e.clientX - cx);
+    const r = Math.hypot(e.clientX - cx, e.clientY - cy) / Math.min(w, h);
+    blips.push({ a, r: Math.min(0.48, r), glow: 1.0 });
+    if (blips.length > 36) blips.shift();
+  });
+  function animate(now) {
+    const t = now * 0.001;
+    cx += (tcx - cx) * 0.06; cy += (tcy - cy) * 0.06;
+    ctx.fillStyle = '#030b0a'; ctx.fillRect(0, 0, w, h);
+    const maxR = Math.min(w, h) * 0.46;
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.18)'; ctx.lineWidth = 1;
+    for (let i = 1; i <= 5; i++) { ctx.beginPath(); ctx.arc(cx, cy, (maxR / 5) * i, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.beginPath(); ctx.moveTo(cx - maxR, cy); ctx.lineTo(cx + maxR, cy); ctx.moveTo(cx, cy - maxR); ctx.lineTo(cx, cy + maxR); ctx.stroke();
+    const sweep = (t * 1.15) % (Math.PI * 2);
+    for (let s = 0; s < 26; s++) {
+      const a0 = sweep - s * 0.035;
+      ctx.strokeStyle = `rgba(52, 211, 153, ${((1 - s / 26) * 0.32).toFixed(3)})`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a0) * maxR, cy + Math.sin(a0) * maxR); ctx.stroke();
+    }
+    for (let i = 0; i < blips.length; i++) {
+      const b = blips[i];
+      let diff = ((sweep - b.a) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+      if (diff < 0.12) b.glow = 1.0;
+      b.glow *= 0.985;
+      if (b.glow < 0.03) continue;
+      const bx = cx + Math.cos(b.a) * b.r * Math.min(w, h);
+      const by = cy + Math.sin(b.a) * b.r * Math.min(w, h);
+      ctx.fillStyle = `rgba(110, 231, 183, ${b.glow.toFixed(3)})`;
+      ctx.beginPath(); ctx.arc(bx, by, 2.5 + b.glow * 3.5, 0, Math.PI * 2); ctx.fill();
+    }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

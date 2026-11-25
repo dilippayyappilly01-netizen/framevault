@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background 211 — Zen Garden Acoustic Water Rings</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #f5f4ef; user-select: none; -webkit-font-smoothing: antialiased; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="stageCanvas"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById('stageCanvas');
+  const ctx = canvas.getContext('2d'); if (!ctx) return;
+  let w = 0, h = 0, dpr = 1, lastDrop = 0;
+  const rings = [];
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize); resize();
+  window.addEventListener('pointerdown', (e) => { rings.push({ x: e.clientX, y: e.clientY, r: 4, a: 0.75 }); });
+  window.addEventListener('pointermove', (e) => { if (Math.random() > 0.88) rings.push({ x: e.clientX, y: e.clientY, r: 4, a: 0.4 }); });
+  function animate(now) {
+    ctx.fillStyle = '#f5f4ef'; ctx.fillRect(0, 0, w, h);
+    if (now - lastDrop > 900) { lastDrop = now; rings.push({ x: Math.random() * w, y: Math.random() * h, r: 4, a: 0.55 }); }
+    for (let i = rings.length - 1; i >= 0; i--) {
+      const r = rings[i]; r.r += 2.2; r.a *= 0.985;
+      if (r.a < 0.015) { rings.splice(i, 1); continue; }
+      ctx.strokeStyle = `rgba(24, 24, 27, ${r.a.toFixed(3)})`; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2); ctx.stroke();
+    }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

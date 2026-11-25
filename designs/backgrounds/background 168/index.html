@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background 168 — Minimalist Tumbling Paper Confetti</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; user-select: none; -webkit-font-smoothing: antialiased; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="stageCanvas"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById('stageCanvas');
+  const ctx = canvas.getContext('2d'); if (!ctx) return;
+  const COLS = ['#2563eb', '#ec4899', '#f59e0b', '#10b981', '#7c3aed', '#0ea5e9'];
+  let w = 0, h = 0, dpr = 1, ptrX = -999, ptrY = -999;
+  const pieces = [];
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!pieces.length) for (let i = 0; i < 110; i++) pieces.push({
+      x: Math.random() * w, y: Math.random() * h, vx: (Math.random() - 0.5) * 0.8, vy: 0.7 + Math.random() * 1.4,
+      rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.06, flip: Math.random() * 6.28,
+      w: 7 + Math.random() * 7, h: 4 + Math.random() * 5, col: COLS[i % COLS.length]
+    });
+  }
+  window.addEventListener('resize', resize); resize();
+  window.addEventListener('pointermove', (e) => { ptrX = e.clientX; ptrY = e.clientY; });
+  window.addEventListener('pointerdown', (e) => {
+    for (let i = 0; i < pieces.length; i++) {
+      const p = pieces[i], dx = p.x - e.clientX, dy = p.y - e.clientY, d = Math.hypot(dx, dy) || 1;
+      if (d < 220) { p.vx += (dx / d) * 6; p.vy += (dy / d) * 6 - 2; }
+    }
+  });
+  function animate() {
+    ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < pieces.length; i++) {
+      const p = pieces[i];
+      const dx = p.x - ptrX, dy = p.y - ptrY, d = Math.hypot(dx, dy);
+      if (d < 130 && d > 1) { p.vx += (dx / d) * 0.35; p.vy += (dy / d) * 0.25; }
+      p.vx *= 0.985; p.vy = Math.min(2.4, p.vy + 0.02);
+      p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.flip += 0.06;
+      if (p.y > h + 20) { p.y = -20; p.x = Math.random() * w; }
+      if (p.x > w + 20) p.x = -20; else if (p.x < -20) p.x = w + 20;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(1, Math.cos(p.flip));
+      ctx.fillStyle = p.col; ctx.fillRect(-p.w * 0.5, -p.h * 0.5, p.w, p.h);
+      ctx.restore();
+    }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

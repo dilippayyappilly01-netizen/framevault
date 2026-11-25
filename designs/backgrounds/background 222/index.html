@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background 222 — Classic 3D Perspective Starfield</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #020308; user-select: none; -webkit-font-smoothing: antialiased; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="stageCanvas"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById('stageCanvas');
+  const ctx = canvas.getContext('2d'); if (!ctx) return;
+  let w = 0, h = 0, dpr = 1, speed = 4, hold = false, ox = 0, oy = 0;
+  const stars = [];
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!stars.length) for (let i = 0; i < 420; i++) stars.push({ x: (Math.random() - 0.5) * 1800, y: (Math.random() - 0.5) * 1800, z: Math.random() * 1000 });
+  }
+  window.addEventListener('resize', resize); resize();
+  window.addEventListener('pointermove', (e) => { ox = (e.clientX / Math.max(w, 1) - 0.5) * 220; oy = (e.clientY / Math.max(h, 1) - 0.5) * 220; });
+  window.addEventListener('pointerdown', () => { hold = true; });
+  window.addEventListener('pointerup', () => { hold = false; });
+  function animate() {
+    speed += ((hold ? 16 : 4.5) - speed) * 0.08;
+    ctx.fillStyle = 'rgba(2, 3, 8, 0.35)'; ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < stars.length; i++) {
+      const s = stars[i];
+      const pz = s.z; s.z -= speed;
+      if (s.z <= 2) { s.x = (Math.random() - 0.5) * 1800; s.y = (Math.random() - 0.5) * 1800; s.z = 1000; continue; }
+      const x1 = w * 0.5 + (s.x + ox) * (320 / s.z), y1 = h * 0.5 + (s.y + oy) * (320 / s.z);
+      const x0 = w * 0.5 + (s.x + ox) * (320 / pz), y0 = h * 0.5 + (s.y + oy) * (320 / pz);
+      const b = Math.min(1, 1 - s.z / 1000);
+      ctx.strokeStyle = `rgba(210, 232, 255, ${b.toFixed(3)})`; ctx.lineWidth = 1 + b * 1.5;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

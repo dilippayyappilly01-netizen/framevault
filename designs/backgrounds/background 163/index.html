@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background 163 — Rotating Swiss Clockwork Ticks</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #f5f5f3; user-select: none; -webkit-font-smoothing: antialiased; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="stageCanvas"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById('stageCanvas');
+  const ctx = canvas.getContext('2d'); if (!ctx) return;
+  let w = 0, h = 0, dpr = 1, ptrX = -999, ptrY = -999, pulse = 0;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize); resize();
+  window.addEventListener('pointermove', (e) => { ptrX = e.clientX; ptrY = e.clientY; });
+  window.addEventListener('pointerdown', () => { pulse = 1.0; });
+  function animate(now) {
+    const t = now * 0.001; pulse *= 0.93;
+    ctx.fillStyle = '#f5f5f3'; ctx.fillRect(0, 0, w, h);
+    const sp = 36; ctx.lineCap = 'round';
+    for (let y = sp * 0.5; y < h; y += sp) {
+      for (let x = sp * 0.5; x < w; x += sp) {
+        const d = Math.hypot(ptrX - x, ptrY - y);
+        const inf = ptrX > -900 ? Math.exp(-d * d / 42000) : 0;
+        const baseA = Math.sin(x * 0.007 + t) + Math.cos(y * 0.007 - t * 0.8);
+        const ang = ptrX > -900 ? baseA * (1 - inf) + Math.atan2(ptrY - y, ptrX - x) * inf : baseA;
+        const len = 8 + inf * 7 + pulse * 5;
+        ctx.strokeStyle = inf > 0.25 ? '#dc2626' : '#18181b';
+        ctx.globalAlpha = 0.25 + inf * 0.72;
+        ctx.lineWidth = 1.5 + inf * 1.4;
+        ctx.beginPath();
+        ctx.moveTo(x - Math.cos(ang) * len * 0.5, y - Math.sin(ang) * len * 0.5);
+        ctx.lineTo(x + Math.cos(ang) * len * 0.5, y + Math.sin(ang) * len * 0.5);
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

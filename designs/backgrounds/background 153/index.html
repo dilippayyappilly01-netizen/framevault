@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background 153 — Alpine Snowfall Depth Drift</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #070b14; user-select: none; -webkit-font-smoothing: antialiased; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="stageCanvas"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById('stageCanvas');
+  const ctx = canvas.getContext('2d'); if (!ctx) return;
+  let w = 0, h = 0, dpr = 1, wind = 0, tWind = 0, ptrX = -999, ptrY = -999, gust = 0;
+  const flakes = [];
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (flakes.length === 0) {
+      for (let i = 0; i < 320; i++) {
+        const z = 0.25 + Math.random() * 0.85;
+        flakes.push({ x: Math.random() * w, y: Math.random() * h, z, r: 0.9 + z * 2.8, ph: Math.random() * 6.28 });
+      }
+    }
+  }
+  window.addEventListener('resize', resize); resize();
+  window.addEventListener('pointermove', (e) => { ptrX = e.clientX; ptrY = e.clientY; tWind = (e.clientX / Math.max(w, 1) - 0.5) * 2.8; });
+  window.addEventListener('pointerleave', () => { ptrX = -999; ptrY = -999; tWind = 0; });
+  window.addEventListener('pointerdown', () => { gust = 4.5; });
+  function animate(now) {
+    const t = now * 0.001;
+    wind += (tWind - wind) * 0.04; gust *= 0.95;
+    const bg = ctx.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, '#070b14'); bg.addColorStop(1, '#111c33');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < flakes.length; i++) {
+      const f = flakes[i];
+      f.x += (wind + Math.sin(t * 0.9 + f.ph) * 0.55 + gust) * f.z;
+      f.y += (0.55 + f.z * 1.45);
+      const dx = f.x - ptrX, dy = f.y - ptrY, d = Math.hypot(dx, dy);
+      if (d < 130 && d > 1) { f.x += (dx / d) * (1 - d / 130) * 3.5; f.y += (dy / d) * (1 - d / 130) * 2.0; }
+      if (f.y > h + 10) { f.y = -10; f.x = Math.random() * w; }
+      if (f.x > w + 10) f.x = -10; else if (f.x < -10) f.x = w + 10;
+      ctx.fillStyle = `rgba(226,240,255,${(0.18 + f.z * 0.72).toFixed(3)})`;
+      ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill();
+    }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

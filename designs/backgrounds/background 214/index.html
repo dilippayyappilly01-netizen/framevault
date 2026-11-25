@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background 214 — Wind-Swaying Botanical Fractal Canopy</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #f6f5f0; user-select: none; -webkit-font-smoothing: antialiased; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="stageCanvas"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById('stageCanvas');
+  const ctx = canvas.getContext('2d'); if (!ctx) return;
+  let w = 0, h = 0, dpr = 1, breeze = 0, tBreeze = 0;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize); resize();
+  window.addEventListener('pointermove', (e) => { tBreeze = (e.clientX / Math.max(w, 1) - 0.5) * 0.45; });
+  function branch(x, y, len, ang, depth, sway) {
+    if (depth === 0) return;
+    const nx = x + Math.cos(ang) * len, ny = y + Math.sin(ang) * len;
+    ctx.strokeStyle = depth < 3 ? '#15803d' : '#292524';
+    ctx.lineWidth = depth * 1.15;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(nx, ny); ctx.stroke();
+    branch(nx, ny, len * 0.74, ang - 0.34 + sway, depth - 1, sway);
+    branch(nx, ny, len * 0.74, ang + 0.34 + sway, depth - 1, sway);
+  }
+  function animate(now) {
+    const t = now * 0.001; breeze += (tBreeze - breeze) * 0.05;
+    ctx.fillStyle = '#f6f5f0'; ctx.fillRect(0, 0, w, h);
+    const sway = Math.sin(t * 1.1) * 0.06 + breeze;
+    branch(w * 0.5, h * 0.96, Math.min(w, h) * 0.22, -Math.PI * 0.5, 9, sway);
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

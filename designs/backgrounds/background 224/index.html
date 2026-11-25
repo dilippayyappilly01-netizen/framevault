@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background 224 — Plucked Elastic Acoustic Strings</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #09080c; user-select: none; -webkit-font-smoothing: antialiased; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="stageCanvas"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById('stageCanvas');
+  const ctx = canvas.getContext('2d'); if (!ctx) return;
+  let w = 0, h = 0, dpr = 1, lastY = -1;
+  const strings = Array.from({ length: 16 }, (_, i) => ({ disp: 0, vel: 0, hue: 195 + i * 9 }));
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize); resize();
+  window.addEventListener('pointermove', (e) => {
+    const curY = e.clientY;
+    if (lastY >= 0) {
+      for (let i = 0; i < strings.length; i++) {
+        const sy = ((i + 1) / (strings.length + 1)) * h;
+        if ((lastY - sy) * (curY - sy) <= 0) strings[i].vel += Math.max(-28, Math.min(28, (curY - lastY) * 0.9));
+      }
+    }
+    lastY = curY;
+  });
+  window.addEventListener('pointerdown', () => { for (let i = 0; i < strings.length; i++) strings[i].vel += (Math.random() - 0.5) * 32; });
+  function animate() {
+    ctx.fillStyle = '#09080c'; ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < strings.length; i++) {
+      const s = strings[i], sy = ((i + 1) / (strings.length + 1)) * h;
+      s.vel += -s.disp * 0.16; s.vel *= 0.93; s.disp += s.vel;
+      const energy = Math.min(1, Math.abs(s.disp) / 36);
+      ctx.strokeStyle = `hsla(${s.hue}, 88%, ${Math.round(52 + energy * 34)}%, ${(0.35 + energy * 0.65).toFixed(2)})`;
+      ctx.lineWidth = 1.2 + energy * 1.8;
+      ctx.beginPath(); ctx.moveTo(0, sy); ctx.quadraticCurveTo(w * 0.5, sy + s.disp * 2.2, w, sy); ctx.stroke();
+    }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

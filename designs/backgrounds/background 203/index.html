@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background 203 — Spirograph Guilloche Engraving</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0a090d; user-select: none; -webkit-font-smoothing: antialiased; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="stageCanvas"></canvas>
+<script>
+(() => {
+  const canvas = document.getElementById('stageCanvas');
+  const ctx = canvas.getContext('2d'); if (!ctx) return;
+  let w = 0, h = 0, dpr = 1, ptrX = 0.5, ptrY = 0.5, tX = 0.5, tY = 0.5;
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize); resize();
+  window.addEventListener('pointermove', (e) => { tX = e.clientX / Math.max(w, 1); tY = e.clientY / Math.max(h, 1); });
+  function animate(now) {
+    const t = now * 0.0005; ptrX += (tX - ptrX) * 0.06; ptrY += (tY - ptrY) * 0.06;
+    ctx.fillStyle = '#0a090d'; ctx.fillRect(0, 0, w, h);
+    const R = Math.min(w, h) * 0.32, r = R * (0.24 + ptrX * 0.22), d = R * (0.45 + ptrY * 0.35);
+    ctx.strokeStyle = 'rgba(245, 198, 92, 0.55)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i <= 900; i++) {
+      const a = (i / 900) * Math.PI * 16 + t;
+      const x = w * 0.5 + (R - r) * Math.cos(a) + d * Math.cos(((R - r) / r) * a);
+      const y = h * 0.5 + (R - r) * Math.sin(a) - d * Math.sin(((R - r) / r) * a);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>
