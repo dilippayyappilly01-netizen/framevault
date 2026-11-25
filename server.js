@@ -999,7 +999,7 @@ function createAppServer(configOverrides = {}, deps = {}) {
       const compiledHtml = compileComponentHtml(comp, body.controlParameterSet || null, { forIframe: false });
       const bundle = buildFigmaBundle(comp, body.controlParameterSet || comp.controlParameterSet, compiledHtml, {
         preset: body.preset || 'desktop',
-        includeSwatches: body.includeSwatches !== false
+        includeSwatches: Boolean(body.includeSwatches)
       });
 
       return sendJson(req, res, config, 200, bundle, { 'Cache-Control': 'no-store' });
@@ -1019,7 +1019,7 @@ function createAppServer(configOverrides = {}, deps = {}) {
 
       let body;
       try {
-        body = await readJsonBody(req, 8 * 1024 * 1024);
+        body = await readJsonBody(req, 12 * 1024 * 1024);
       } catch (err) {
         return sendJson(req, res, config, err.statusCode || 400, { error: err.message });
       }
@@ -1033,12 +1033,20 @@ function createAppServer(configOverrides = {}, deps = {}) {
       const compiledHtml = compileComponentHtml(comp, body.controlParameterSet || null, { forIframe: false });
       const bundle = buildFigmaBundle(comp, body.controlParameterSet || comp.controlParameterSet, compiledHtml, {
         preset: body.preset || 'desktop',
-        includeSwatches: body.includeSwatches !== false
+        includeSwatches: Boolean(body.includeSwatches)
       });
 
       db.logExport(license.licenseKey, `${comp.id}:figma-${format}`);
 
-      const content = format === 'tokens' ? bundle.tokensJson : bundle.svg;
+      const rawClientSvg = typeof body.clientSvg === 'string' ? body.clientSvg.trim() : '';
+      const useClientSvg =
+        format === 'svg' &&
+        rawClientSvg.startsWith('<svg') &&
+        rawClientSvg.endsWith('</svg>');
+
+      const content = format === 'tokens'
+        ? bundle.tokensJson
+        : (useClientSvg ? rawClientSvg : bundle.svg);
       const contentType = format === 'tokens'
         ? 'application/json; charset=utf-8'
         : 'image/svg+xml; charset=utf-8';

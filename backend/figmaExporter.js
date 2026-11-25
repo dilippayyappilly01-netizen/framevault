@@ -316,7 +316,7 @@ function buildFigmaTokensJson(comp, cps, compiledHtml, presetKey = 'desktop') {
 function buildFigmaBundle(comp, cps, compiledHtml, options = {}) {
   const presetKey = FRAME_PRESETS[options.preset] ? options.preset : 'desktop';
   const preset = FRAME_PRESETS[presetKey];
-  const includeSwatches = options.includeSwatches !== false;
+  const includeSwatches = Boolean(options.includeSwatches);
   const w = preset.width;
   const h = preset.height;
 
@@ -331,23 +331,19 @@ function buildFigmaBundle(comp, cps, compiledHtml, options = {}) {
   else if (sec.includes('cube')) artworkGroup = buildCubeLayers(w, h, pal);
   else artworkGroup = buildAssetLayers(w, h, pal);
 
-  const subtitleText = labels.domTexts[0] || `${String(comp?.section || 'COMPONENT').toUpperCase()} · ${comp?.engine || 'INTERACTIVE 3D'}`;
-
-  const overlayGroup = `
-  <g id="UI_Header_Overlay">
-    <rect id="Badge_Pill" x="36" y="34" width="168" height="30" rx="15" fill="${pal.surface}" fill-opacity="0.86" stroke="${pal.border}" stroke-width="1" />
-    <text id="Badge_Label" x="52" y="53" fill="${pal.primary}" font-family="${escapeXml(labels.primaryFont)}, sans-serif" font-size="11" font-weight="600">FRAMEVAULT · ${escapeXml(String(comp?.name || componentName).toUpperCase())}</text>
-    <text id="Component_Title" x="36" y="96" fill="${pal.foreground}" font-family="${escapeXml(labels.primaryFont)}, sans-serif" font-size="${w < 500 ? 20 : 28}" font-weight="700">${escapeXml(labels.title.slice(0, w < 500 ? 32 : 64))}</text>
-    <text id="Component_Subtitle" x="36" y="122" fill="${pal.foregroundMuted}" font-family="${escapeXml(labels.primaryFont)}, sans-serif" font-size="13">${escapeXml(subtitleText.slice(0, 72))}</text>
-  </g>`;
+  const textOverlays = labels.domTexts.length > 0
+    ? `\n  <g id="Component_Text_Layers">\n${labels.domTexts
+        .map((txt, idx) => `    <text id="Text_Layer_${idx + 1}" x="48" y="${64 + idx * 32}" fill="${pal.foreground}" font-family="${escapeXml(labels.primaryFont)}, sans-serif" font-size="${idx === 0 ? 20 : 14}" font-weight="${idx === 0 ? 600 : 400}">${escapeXml(txt)}</text>`)
+        .join('\n')}\n  </g>`
+    : '';
 
   const swatchGroup = includeSwatches && w >= 640
     ? buildTokenSwatchesLayer(w, h, pal, labels)
     : '';
 
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg id="${escapeXml(componentName)}_Frame" xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" fill="none">
-  <title>${escapeXml(labels.title)} — Editable Figma Frame</title>
+  // Start directly with <svg ...> (no <?xml?> prolog) so Figma Ctrl+V always pastes editable layers
+  const svg = `<svg id="${escapeXml(componentName)}_Frame" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" fill="none">
+  <title>${escapeXml(labels.title)}</title>
   <defs>
     <radialGradient id="fvOrbHalo" cx="50%" cy="50%" r="50%">
       <stop offset="0%" stop-color="${pal.primary}" stop-opacity="0.42" />
@@ -367,9 +363,8 @@ function buildFigmaBundle(comp, cps, compiledHtml, options = {}) {
   </defs>
   <g id="Background_Stage">
     <rect id="Stage_Fill" x="0" y="0" width="${w}" height="${h}" fill="${pal.background}" />
-  </g>${artworkGroup}${overlayGroup}${swatchGroup}
-</svg>
-`;
+  </g>${artworkGroup}${textOverlays}${swatchGroup}
+</svg>`;
 
   const tokensObj = buildFigmaTokensJson(comp, cps, compiledHtml, presetKey);
   const tokensJson = JSON.stringify(tokensObj, null, 2);

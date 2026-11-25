@@ -2752,6 +2752,411 @@
   let activeFigmaCompId = null;
   let activeFigmaBundle = null;
 
+  function parseCssColorToHexOpacity(rawColor) {
+    const s = String(rawColor || '').trim();
+    if (!s || s === 'transparent' || s === 'none') return null;
+    const m = s.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/i);
+    if (!m) return null;
+    const r = Math.max(0, Math.min(255, Math.round(Number(m[1]))));
+    const g = Math.max(0, Math.min(255, Math.round(Number(m[2]))));
+    const b = Math.max(0, Math.min(255, Math.round(Number(m[3]))));
+    const a = m[4] !== undefined ? Math.max(0, Math.min(1, Number(m[4]))) : 1;
+    if (a <= 0.01) return null;
+    const hex = '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+    return { r, g, b, a, hex };
+  }
+
+  function sanitizeSvgId(raw, fallback) {
+    const cleaned = String(raw || '').trim().replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '');
+    return cleaned || fallback;
+  }
+
+  function applyTextTransform(str, transform) {
+    if (transform === 'uppercase') return str.toUpperCase();
+    if (transform === 'lowercase') return str.toLowerCase();
+    if (transform === 'capitalize') return str.replace(/\b\w/g, c => c.toUpperCase());
+    return str;
+  }
+
+  function getElementZDepth(el, cs) {
+    let z = 0;
+    const zi = parseFloat(cs.zIndex);
+    if (Number.isFinite(zi)) z += zi * 1000;
+    const tf = cs.transform;
+    if (tf && tf.startsWith('matrix3d(')) {
+      const nums = tf.slice(9, -1).split(',').map(Number);
+      if (nums.length === 16 && Number.isFinite(nums[14])) {
+        z += nums[14];
+      }
+    }
+    return z;
+  }
+
+  function renderCanvasToPngDataUrl(srcCanvas, stageBgRgb) {
+    const w = srcCanvas.width;
+    const h = srcCanvas.height;
+    if (!w || !h) return null;
+
+    const maxDim = 1600;
+    const scale = Math.min(1, maxDim / Math.max(w, h));
+    const outW = Math.max(1, Math.round(w * scale));
+    const outH = Math.max(1, Math.round(h * scale));
+
+    const off = document.createElement('canvas');
+    off.width = outW;
+    off.height = outH;
+    const ctx = off.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.drawImage(srcCanvas, 0, 0, outW, outH);
+
+    // If stage background is pure/near-black and canvas corners are also dark black,
+    // knock out black to true alpha with unpremultiplied color recovery so over Stage_Background
+    // it is pixel-identical yet completely transparent when moved/recolored in Figma!
+    const bgLum = (0.299 * stageBgRgb.r + 0.587 * stageBgRgb.g + 0.114 * stageBgRgb.b) / 255;
+    if (bgLum < 0.05) {
+      try {
+        const imgData = ctx.getImageData(0, 0, outW, outH);
+        const d = imgData.data;
+        const cornerIdx = [0, (outW - 1) * 4, ((outH - 1) * outW) * 4, (outW * outH - 1) * 4];
+        const darkCorners = cornerIdx.every(idx => d[idx] < 18 && d[idx + 1] < 18 && d[idx + 2] < 18);
+        if (darkCorners) {
+          for (let i = 0; i < d.length; i += 4) {
+            const r = d[i], g = d[i + 1], b = d[i + 2];
+            const maxC = r > g ? (r > b ? r : b) : (g > b ? g : b);
+            if (maxC === 0) {
+              d[i + 3] = 0;
+            } else {
+              const inv = 255 / maxC;
+              d[i] = Math.min(255, Math.round(r * inv));
+              d[i + 1] = Math.min(255, Math.round(g * inv));
+              d[i + 2] = Math.min(255, Math.round(b * inv));
+              d[i + 3] = maxC;
+            }
+          }
+          ctx.putImageData(imgData, 0, 0);
+        }
+      } catch (_) {}
+    }
+
+    try {
+      return off.toDataURL('image/png');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function renderImgElementToDataUrl(imgEl, targetW, targetH) {
+    const nw = imgEl.naturalWidth || imgEl.width;
+    const nh = imgEl.naturalHeight || imgEl.height;
+    if (!nw || !nh) return null;
+    const cw = Math.max(1, Math.min(800, Math.round(targetW * 1.5)));
+    const ch = Math.max(1, Math.min(800, Math.round(targetH * 1.5)));
+    const off = document.createElement('canvas');
+    off.width = cw;
+    off.height = ch;
+    const ctx = off.getContext('2d');
+    if (!ctx) return null;
+
+    // Cover crop matching CSS object-fit: cover
+    const srcRatio = nw / nh;
+    const dstRatio = cw / ch;
+    let sx = 0, sy = 0, sw = nw, sh = nh;
+    if (srcRatio > dstRatio) {
+      sw = nh * dstRatio;
+      sx = (nw - sw) / 2;
+    } else {
+      sh = nw / dstRatio;
+      sy = (nh - sh) / 2;
+    }
+    try {
+      ctx.drawImage(imgEl, sx, sy, sw, sh, 0, 0, cw, ch);
+      return off.toDataURL('image/jpeg', 0.88);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function captureLiveComponentToFigmaSvg(comp, bundle, includeSwatches) {
+    const w = bundle.width || 1440;
+    const h = bundle.height || 900;
+
+    // Resolve preview URL with ?capture=1 so WebGL preserveDrawingBuffer is enabled
+    let previewUrl = `/api/preview/${encodeURIComponent(comp.id)}?capture=1`;
+    if (customizedSet.has(comp.id) && comp.controlParameterSet) {
+      try {
+        const res = await fetch(`/api/preview/${encodeURIComponent(comp.id)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ controlParameterSet: comp.controlParameterSet })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.previewUrl) {
+            previewUrl = data.previewUrl + (data.previewUrl.includes('?') ? '&capture=1' : '?capture=1');
+          }
+        }
+      } catch (_) {}
+    }
+
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+    iframe.style.position = 'fixed';
+    iframe.style.left = '-10000px';
+    iframe.style.top = '0';
+    iframe.style.width = `${w}px`;
+    iframe.style.height = `${h}px`;
+    iframe.style.border = '0';
+    iframe.style.opacity = '0.01';
+    iframe.style.pointerEvents = 'none';
+    document.body.appendChild(iframe);
+
+    try {
+      await new Promise((resolve) => {
+        const timer = setTimeout(resolve, 3500);
+        iframe.onload = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+        iframe.src = previewUrl;
+      });
+
+      const doc = iframe.contentDocument;
+      const win = iframe.contentWindow;
+      if (!doc || !win || !doc.body) return null;
+
+      // Wait for all <img> elements inside the preview to finish decoding
+      const imgs = Array.from(doc.querySelectorAll('img'));
+      if (imgs.length > 0) {
+        await Promise.race([
+          Promise.all(
+            imgs.map(img =>
+              img.complete
+                ? Promise.resolve()
+                : new Promise(r => {
+                    img.addEventListener('load', r, { once: true });
+                    img.addEventListener('error', r, { once: true });
+                  })
+            )
+          ),
+          new Promise(r => setTimeout(r, 2200))
+        ]);
+      }
+
+      // Let WebGL / Canvas / DOM 3D settle for a few animation frames
+      await new Promise(r =>
+        win.requestAnimationFrame(() =>
+          win.requestAnimationFrame(() =>
+            win.requestAnimationFrame(() => setTimeout(r, 160))
+          )
+        )
+      );
+
+      const bodyCs = win.getComputedStyle(doc.body);
+      const htmlCs = win.getComputedStyle(doc.documentElement);
+      const bgParsed =
+        parseCssColorToHexOpacity(bodyCs.backgroundColor) ||
+        parseCssColorToHexOpacity(htmlCs.backgroundColor) ||
+        { r: 0, g: 0, b: 0, a: 1, hex: bundle.palette?.background || '#000000' };
+
+      const defs = [];
+      const canvasLayers = [];
+      const domItems = [];
+      let patSeq = 0;
+
+      // 1. Capture live <canvas> layers (WebGL 3D shaders & Canvas 2D)
+      const canvases = Array.from(doc.querySelectorAll('canvas'));
+      canvases.forEach((cv, idx) => {
+        const cs = win.getComputedStyle(cv);
+        if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) <= 0.01) return;
+        const rect = cv.getBoundingClientRect();
+        if (rect.width < 2 || rect.height < 2) return;
+        const dataUrl = renderCanvasToPngDataUrl(cv, bgParsed);
+        if (!dataUrl) return;
+        const patId = `fv_canvas_${++patSeq}`;
+        const rx = Math.round(parseFloat(cs.borderTopLeftRadius) || 0);
+        const op = Number(cs.opacity);
+        const opAttr = op < 0.99 ? ` opacity="${op.toFixed(2)}"` : '';
+        defs.push(
+          `    <pattern id="${patId}" patternUnits="objectBoundingBox" width="1" height="1">` +
+          `<image href="${dataUrl}" xlink:href="${dataUrl}" width="${Math.round(rect.width)}" height="${Math.round(rect.height)}" preserveAspectRatio="none" />` +
+          `</pattern>`
+        );
+        canvasLayers.push(
+          `    <rect id="${sanitizeSvgId(cv.id || `Rendered_Visual_${idx + 1}`, `Rendered_Visual_${idx + 1}`)}" x="${Math.round(rect.left)}" y="${Math.round(rect.top)}" width="${Math.round(rect.width)}" height="${Math.round(rect.height)}"${rx > 0 ? ` rx="${rx}"` : ''} fill="url(#${patId})"${opAttr} />`
+        );
+      });
+
+      // 2. Walk live DOM elements (cards, images, buttons, headers, SVGs, text)
+      const skipIds = new Set(['ok-tint-layer', 'ok-vignette-layer']);
+      const allEls = Array.from(doc.body.querySelectorAll('*'));
+      allEls.forEach((el, domIdx) => {
+        const tag = el.tagName.toLowerCase();
+        if (
+          tag === 'script' || tag === 'style' || tag === 'canvas' ||
+          tag === 'defs' || tag === 'filter' || tag === 'feturbulence' ||
+          tag === 'fedisplacementmap' || tag === 'fecolormatrix' ||
+          skipIds.has(el.id)
+        ) {
+          return;
+        }
+        // Skip SVG child shapes here (handled by their parent <svg>)
+        if (el.closest('svg') && tag !== 'svg') return;
+
+        const cs = win.getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden') return;
+        const opacity = Number(cs.opacity);
+        if (opacity <= 0.02) return;
+
+        const rect = el.getBoundingClientRect();
+        if (rect.width < 1 || rect.height < 1) return;
+        if (rect.right < -20 || rect.left > w + 20 || rect.bottom < -20 || rect.top > h + 20) return;
+
+        const z = getElementZDepth(el, cs);
+
+        // A. Inline <svg> overlays (guide lines, icons, apertures)
+        if (tag === 'svg') {
+          const shapes = [];
+          el.querySelectorAll('path, line, circle, ellipse, rect, polyline, polygon').forEach((sh, sIdx) => {
+            const scs = win.getComputedStyle(sh);
+            if (scs.display === 'none' || scs.visibility === 'hidden') return;
+            const shTag = sh.tagName.toLowerCase();
+            const fillC = parseCssColorToHexOpacity(scs.fill);
+            const strokeC = parseCssColorToHexOpacity(scs.stroke);
+            const sw = parseFloat(scs.strokeWidth) || 0;
+            if (!fillC && (!strokeC || sw <= 0)) return;
+            const fillAttr = fillC ? ` fill="${fillC.hex}"${fillC.a < 0.99 ? ` fill-opacity="${fillC.a.toFixed(2)}"` : ''}` : ' fill="none"';
+            const strokeAttr = strokeC && sw > 0
+              ? ` stroke="${strokeC.hex}" stroke-width="${sw.toFixed(2)}"${strokeC.a < 0.99 ? ` stroke-opacity="${strokeC.a.toFixed(2)}"` : ''}`
+              : '';
+            const attrs = ['d', 'x', 'y', 'width', 'height', 'rx', 'cx', 'cy', 'r', 'x1', 'y1', 'x2', 'y2', 'points']
+              .filter(a => sh.hasAttribute(a))
+              .map(a => ` ${a}="${escapeHtml(sh.getAttribute(a))}"`)
+              .join('');
+            shapes.push(`      <${shTag} id="${sanitizeSvgId(sh.id || `${shTag}_${sIdx + 1}`, `Vector_${sIdx + 1}`)}"${attrs}${fillAttr}${strokeAttr} />`);
+          });
+          if (shapes.length > 0) {
+            const vb = el.getAttribute('viewBox');
+            let transformAttr = ` transform="translate(${Math.round(rect.left)} ${Math.round(rect.top)})"`;
+            if (vb) {
+              const parts = vb.trim().split(/[\s,]+/).map(Number);
+              if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+                const sx = rect.width / parts[2];
+                const sy = rect.height / parts[3];
+                transformAttr = ` transform="translate(${Math.round(rect.left - parts[0] * sx)} ${Math.round(rect.top - parts[1] * sy)}) scale(${sx.toFixed(4)} ${sy.toFixed(4)})"`;
+              }
+            }
+            const opAttr = opacity < 0.99 ? ` opacity="${opacity.toFixed(2)}"` : '';
+            domItems.push({
+              z,
+              order: domIdx,
+              svg: `    <g id="${sanitizeSvgId(el.id || `Vector_Overlay_${domIdx}`, 'Vector_Overlay')}"${transformAttr}${opAttr}>\n${shapes.join('\n')}\n    </g>`
+            });
+          }
+          return;
+        }
+
+        // B. <img> elements (carousel photo cards, thumbnails, artwork)
+        if (tag === 'img') {
+          const dataUrl = renderImgElementToDataUrl(el, rect.width, rect.height);
+          if (!dataUrl) return;
+          const patId = `fv_img_${++patSeq}`;
+          const rx = Math.round(parseFloat(cs.borderTopLeftRadius) || parseFloat(win.getComputedStyle(el.parentElement)?.borderTopLeftRadius) || 0);
+          const opAttr = opacity < 0.99 ? ` opacity="${opacity.toFixed(2)}"` : '';
+          defs.push(
+            `    <pattern id="${patId}" patternUnits="objectBoundingBox" width="1" height="1">` +
+            `<image href="${dataUrl}" xlink:href="${dataUrl}" width="${Math.round(rect.width)}" height="${Math.round(rect.height)}" preserveAspectRatio="xMidYMid slice" />` +
+            `</pattern>`
+          );
+          domItems.push({
+            z,
+            order: domIdx,
+            svg: `    <rect id="${sanitizeSvgId(el.alt || el.id || `Card_Image_${patSeq}`, `Card_Image_${patSeq}`)}" x="${Math.round(rect.left)}" y="${Math.round(rect.top)}" width="${Math.round(rect.width)}" height="${Math.round(rect.height)}"${rx > 0 ? ` rx="${rx}"` : ''} fill="url(#${patId})"${opAttr} />`
+          });
+          return;
+        }
+
+        // C. Styled containers / cards / buttons / badges
+        const fillC = parseCssColorToHexOpacity(cs.backgroundColor);
+        const bw = parseFloat(cs.borderTopWidth) || 0;
+        const borderC = bw > 0 ? parseCssColorToHexOpacity(cs.borderTopColor) : null;
+        if (fillC || borderC) {
+          const rx = Math.round(parseFloat(cs.borderTopLeftRadius) || 0);
+          const fillAttr = fillC ? ` fill="${fillC.hex}"${fillC.a < 0.99 ? ` fill-opacity="${fillC.a.toFixed(2)}"` : ''}` : ' fill="none"';
+          const strokeAttr = borderC && bw > 0
+            ? ` stroke="${borderC.hex}" stroke-width="${bw.toFixed(1)}"${borderC.a < 0.99 ? ` stroke-opacity="${borderC.a.toFixed(2)}"` : ''}`
+            : '';
+          const opAttr = opacity < 0.99 ? ` opacity="${opacity.toFixed(2)}"` : '';
+          const layerId = sanitizeSvgId(el.id || (el.className && typeof el.className === 'string' ? el.className.split(/\s+/)[0] : tag), `${tag}_${domIdx}`);
+          domItems.push({
+            z,
+            order: domIdx,
+            svg: `    <rect id="${layerId}" x="${Math.round(rect.left)}" y="${Math.round(rect.top)}" width="${Math.round(rect.width)}" height="${Math.round(rect.height)}"${rx > 0 ? ` rx="${rx}"` : ''}${fillAttr}${strokeAttr}${opAttr} />`
+          });
+        }
+
+        // D. Direct visible text nodes (exact sub-pixel Range coordinates!)
+        for (const child of Array.from(el.childNodes)) {
+          if (child.nodeType !== 3) continue;
+          const rawText = child.textContent.replace(/\s+/g, ' ').trim();
+          if (!rawText) continue;
+          const range = doc.createRange();
+          range.selectNodeContents(child);
+          const tRect = range.getBoundingClientRect();
+          if (tRect.width < 1 || tRect.height < 1) continue;
+          const txtC = parseCssColorToHexOpacity(cs.color) || { hex: '#ffffff', a: 1 };
+          const fontSize = Math.max(8, Math.round(parseFloat(cs.fontSize) || 14));
+          const fontWeight = cs.fontWeight || '400';
+          const fontFamily = (cs.fontFamily || 'Inter, sans-serif').split(',')[0].replace(/['"]/g, '').trim() || 'Inter';
+          const letterSpacing = parseFloat(cs.letterSpacing);
+          const lsAttr = Number.isFinite(letterSpacing) && Math.abs(letterSpacing) > 0.1 ? ` letter-spacing="${letterSpacing.toFixed(2)}"` : '';
+          const displayText = applyTextTransform(rawText, cs.textTransform);
+          const baselineY = Math.round(tRect.top + fontSize * 0.82);
+          const opAttr = opacity * txtC.a < 0.99 ? ` fill-opacity="${(opacity * txtC.a).toFixed(2)}"` : '';
+          domItems.push({
+            z: z + 0.5,
+            order: domIdx + 0.5,
+            svg: `    <text id="${sanitizeSvgId(displayText.slice(0, 24), `Text_${domIdx}`)}" x="${Math.round(tRect.left)}" y="${baselineY}" fill="${txtC.hex}"${opAttr} font-family="${escapeHtml(fontFamily)}, sans-serif" font-size="${fontSize}" font-weight="${escapeHtml(fontWeight)}"${lsAttr}>${escapeHtml(displayText)}</text>`
+          });
+        }
+      });
+
+      domItems.sort((a, b) => (a.z !== b.z ? a.z - b.z : a.order - b.order));
+
+      if (canvasLayers.length === 0 && domItems.length === 0) return null;
+
+      let swatchXml = '';
+      if (includeSwatches && bundle.palette && w >= 640) {
+        const pal = bundle.palette;
+        const swY = h - 78;
+        const swatches = [
+          { name: 'BG', hex: bgParsed.hex },
+          { name: 'Primary', hex: pal.primary },
+          { name: 'Secondary', hex: pal.secondary },
+          { name: 'Accent', hex: pal.tertiary }
+        ];
+        swatchXml = `\n  <g id="Color_Swatches">\n` + swatches.map((sw, idx) => {
+          const x = 36 + idx * 144;
+          return `    <g id="Swatch_${sw.name}"><rect x="${x}" y="${swY}" width="132" height="44" rx="10" fill="${pal.surface}" stroke="${pal.border}" stroke-width="1" /><rect x="${x + 8}" y="${swY + 8}" width="28" height="28" rx="6" fill="${sw.hex}" /><text x="${x + 44}" y="${swY + 20}" fill="${pal.foreground}" font-family="Inter, sans-serif" font-size="11" font-weight="600">${sw.name}</text><text x="${x + 44}" y="${swY + 34}" fill="${pal.foregroundMuted}" font-family="monospace" font-size="10">${sw.hex.toUpperCase()}</text></g>`;
+        }).join('\n') + `\n  </g>`;
+      }
+
+      const defsBlock = defs.length > 0 ? `\n  <defs>\n${defs.join('\n')}\n  </defs>` : '';
+      const canvasBlock = canvasLayers.length > 0 ? `\n  <g id="Visual_Stage">\n${canvasLayers.join('\n')}\n  </g>` : '';
+      const domBlock = domItems.length > 0 ? `\n  <g id="Component_Layers">\n${domItems.map(item => item.svg).join('\n')}\n  </g>` : '';
+
+      // Start directly with <svg ...> (NO <?xml?> header) so Figma Ctrl+V always imports editable layers
+      return `<svg id="${sanitizeSvgId(bundle.componentName || comp.name, 'FrameVault')}_Frame" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" fill="none">${defsBlock}
+  <g id="Stage_Background">
+    <rect id="Background_Fill" x="0" y="0" width="${w}" height="${h}" fill="${bgParsed.hex}" />
+  </g>${canvasBlock}${domBlock}${swatchXml}
+</svg>`;
+    } catch (_) {
+      return null;
+    } finally {
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    }
+  }
+
   async function refreshFigmaPreview() {
     const comp = compMap.get(activeFigmaCompId);
     const stage = document.getElementById('figmaPreviewStage');
@@ -2759,7 +3164,7 @@
 
     const preset = document.getElementById('figmaFramePreset')?.value || 'desktop';
     const includeSwatches = Boolean(document.getElementById('figmaIncludeSwatches')?.checked);
-    stage.innerHTML = '<span style="color:var(--text-muted);font-size:12.5px;">Generating editable Figma layers...</span>';
+    stage.innerHTML = '<span style="color:var(--text-muted);font-size:12.5px;">Capturing live component layers for Figma...</span>';
 
     try {
       const res = await fetch('/api/figma', {
@@ -2784,9 +3189,18 @@
         return;
       }
       const bundle = await res.json();
+      const liveSvg = await captureLiveComponentToFigmaSvg(comp, bundle, includeSwatches);
+      if (activeFigmaCompId !== comp.id) return;
+      if (liveSvg) {
+        bundle.svg = liveSvg;
+      }
       activeFigmaBundle = bundle;
-      const svgDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(bundle.svg)}`;
-      stage.innerHTML = `<img src="${svgDataUrl}" alt="${escapeHtml(bundle.componentName)} editable Figma preview">`;
+      const svgBlob = new Blob([bundle.svg], { type: 'image/svg+xml;charset=utf-8' });
+      const blobUrl = URL.createObjectURL(svgBlob);
+      const prevUrl = stage.dataset.blobUrl;
+      if (prevUrl) URL.revokeObjectURL(prevUrl);
+      stage.dataset.blobUrl = blobUrl;
+      stage.innerHTML = `<img src="${blobUrl}" alt="${escapeHtml(bundle.componentName)} editable Figma preview">`;
     } catch (_) {
       stage.innerHTML = '<span style="color:#ef4444;font-size:12.5px;">Network error generating Figma layers.</span>';
     }
@@ -2835,7 +3249,8 @@
           format,
           preset,
           includeSwatches,
-          controlParameterSet: comp.controlParameterSet
+          controlParameterSet: comp.controlParameterSet,
+          ...(format === 'svg' && activeFigmaBundle?.svg ? { clientSvg: activeFigmaBundle.svg } : {})
         })
       });
       if (res.status === 402) {

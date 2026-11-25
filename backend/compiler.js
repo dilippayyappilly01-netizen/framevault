@@ -395,6 +395,17 @@ function compileComponentHtml(comp, userCps = null, options = {}) {
   (() => {
     window.__OK_STATE__ = ${safeStateJson};
 
+    // Preserve WebGL drawing buffer when rendering inside offscreen Figma capture iframe (?capture=1)
+    if (window.location.search.indexOf('capture=1') !== -1 && typeof HTMLCanvasElement !== 'undefined') {
+      const origGetContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function(type, attrs) {
+        if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+          attrs = Object.assign({}, attrs || {}, { preserveDrawingBuffer: true });
+        }
+        return origGetContext.call(this, type, attrs);
+      };
+    }
+
     const origRAF = window.requestAnimationFrame.bind(window);
     const origPerfNow = performance.now.bind(performance);
     let lastRealTime = origPerfNow();
