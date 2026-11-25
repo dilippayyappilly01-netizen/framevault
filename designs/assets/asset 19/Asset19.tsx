@@ -179,7 +179,7 @@ function initAsset19Runtime(__fvRuntime: ScopedRuntimeContext): void {
       // Right (+X): icy sky-blue, powder blue, aqua-cyan (#7ce8ff, #42a5ff, #b5f4ff)
       // Top-left / Mid: periwinkle & violet-indigo (#5248f5, #6c5ce7)
       // Left / Inner: deep cobalt blue & emerald-teal accents (#1e38d8, #1db896)
-      let cr, cg, cb;
+      let cr: any, cg: any, cb: any;
       const rnd = Math.random();
       if (uX > 0.58) {
         if (rnd < 0.45)      { cr = 0.48; cg = 0.86; cb = 1.00; }

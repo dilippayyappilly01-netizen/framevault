@@ -1078,3 +1078,58 @@ test('OWNER_LICENSE_KEY unlocks all paid features in production without exposing
     await srv.close();
   }
 });
+
+test('Figma Plugin API (/api/figma-plugin/*) supports CORS, Bearer auth, live preview bundle, and TSX code', async () => {
+  const secretOwnerKey = 'FV-OWNER-FIGMA-PLUGIN-TEST-9999';
+  const srv = await startTestServer({
+    NODE_ENV: 'production',
+    OWNER_LICENSE_KEY: secretOwnerKey,
+    PUBLIC_URL: 'https://framevault-qtim.onrender.com'
+  });
+
+  try {
+    // 1. CORS preflight succeeds for Figma null-origin iframe
+    const preflight = await request(srv.baseUrl, '/api/figma-plugin/catalog', {
+      method: 'OPTIONS'
+    });
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers['access-control-allow-origin'], '*');
+
+    // 2. Unauthorized without Bearer license key returns 401 with CORS header
+    const unauth = await request(srv.baseUrl, '/api/figma-plugin/verify');
+    assert.equal(unauth.status, 401);
+    assert.equal(unauth.headers['access-control-allow-origin'], '*');
+
+    // 3. Authorized /verify succeeds and returns MCP URL + count
+    const authHeaders = { Authorization: `Bearer ${secretOwnerKey}` };
+    const verifyRes = await request(srv.baseUrl, '/api/figma-plugin/verify', { headers: authHeaders });
+    assert.equal(verifyRes.status, 200);
+    assert.equal(verifyRes.json.unlocked, true);
+    assert.equal(verifyRes.json.mcpUrl, 'https://framevault-qtim.onrender.com/api/mcp');
+    assert.ok(verifyRes.json.totalComponents >= 50);
+
+    // 4. /catalog returns searchable items + sections
+    const catRes = await request(srv.baseUrl, '/api/figma-plugin/catalog', { headers: authHeaders });
+    assert.equal(catRes.status, 200);
+    assert.ok(Array.isArray(catRes.json.components) && catRes.json.components.length >= 50);
+    const sample = catRes.json.components[0];
+
+    // 5. /preview/:id returns live previewHtml with <base href> & preserveDrawingBuffer
+    const prevRes = await request(srv.baseUrl, `/api/figma-plugin/preview/${encodeURIComponent(sample.id)}`, {
+      headers: authHeaders
+    });
+    assert.equal(prevRes.status, 200);
+    assert.ok(prevRes.json.previewHtml.includes('<base href="https://framevault-qtim.onrender.com/'));
+    assert.ok(prevRes.json.previewHtml.includes('preserveDrawingBuffer'));
+
+    // 6. /code/:id?format=tsx returns valid React TSX source
+    const codeRes = await request(srv.baseUrl, `/api/figma-plugin/code/${encodeURIComponent(sample.id)}?format=tsx`, {
+      headers: authHeaders
+    });
+    assert.equal(codeRes.status, 200);
+    assert.equal(codeRes.json.format, 'tsx');
+    assert.ok(codeRes.json.code.includes("import React"));
+  } finally {
+    await srv.close();
+  }
+});

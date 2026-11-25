@@ -224,7 +224,7 @@ function initAsset5Runtime(__fvRuntime: ScopedRuntimeContext): void {
         const alpha = Math.min(0.95, (0.28 + throatGlow * 0.68) * depthBright * outerFade);
   
         // Authentic chartreuse / lime-green / emerald-yellow palette from Asset 5 video
-        let r, g, b;
+        let r: any, g: any, b: any;
         if (throatGlow > 0.45 || p.hueShift > 0.72) {
           r = 185 + Math.round(throatGlow * 65);
           g = 255;

@@ -79,7 +79,7 @@ function initBackground130Runtime(__fvRuntime: ScopedRuntimeContext): void {
     const palette = [toRgb(COL_A), toRgb(COL_B), toRgb(COL_C)];
   
     let width = 0, height = 0, dpr = 1;
-    let nodes: any[] = [];
+    let nodes: any = [];
     const pulses: any[] = [];
   
     function init() {

@@ -92,7 +92,7 @@ function initBackground8Runtime(__fvRuntime: ScopedRuntimeContext): void {
     let width = 0;
     let height = 0;
     let dpr = 1;
-    let nodes: any[] = [];
+    let nodes: any = [];
     const pulses: any[] = [];
   
     function initNodes() {

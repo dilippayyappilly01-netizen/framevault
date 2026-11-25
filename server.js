@@ -1258,6 +1258,187 @@ function createAppServer(configOverrides = {}, deps = {}) {
       return sendJson(req, res, config, result.status, result.payload, { 'Cache-Control': 'no-store' });
     }
 
+    // 14. Official FrameVault Figma Plugin API (/api/figma-plugin/* — CORS enabled for Figma plugin iframe)
+    if (safeUrl.startsWith('/api/figma-plugin/')) {
+      const figmaCorsHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+        'Cache-Control': 'no-store'
+      };
+
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204, applySecurityHeaders(req, res, config, figmaCorsHeaders));
+        return res.end();
+      }
+
+      // Authenticate via Bearer license key (OK-PRO-... or OWNER_LICENSE_KEY) or cookie
+      let license = verifyLicenseFromRequest(req, db);
+      if (!license) {
+        const authHeader = String(req.headers.authorization || '').trim();
+        const bearerMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+        if (bearerMatch) {
+          const rawKey = bearerMatch[1].trim();
+          license = db.findActiveLicenseByKey(rawKey) || db.findActiveLicenseByKey(rawKey.toUpperCase());
+        }
+      }
+
+      if (!license) {
+        return sendJson(
+          req,
+          res,
+          config,
+          401,
+          {
+            error: `Valid FrameVault All-Access license key (${config.licensePriceDisplay}) required. Sign in with your OK-PRO-... license key.`
+          },
+          figmaCorsHeaders
+        );
+      }
+
+      const publicBase = (config.publicUrl || resolveOrigin(req, config)).replace(/\/$/, '');
+      const mcpUrl = `${publicBase}/api/mcp`;
+
+      // 14A. Verify license key & return plugin metadata
+      if (safeUrl === '/api/figma-plugin/verify' && req.method === 'GET') {
+        return sendJson(
+          req,
+          res,
+          config,
+          200,
+          {
+            unlocked: true,
+            email: license.email,
+            licenseKey: license.isOwner ? (license.displayKey || 'OWNER-ACCESS') : license.licenseKey,
+            totalComponents: catalog.components.length,
+            mcpUrl
+          },
+          figmaCorsHeaders
+        );
+      }
+
+      // 14B. Return full searchable catalog for Figma plugin
+      if (safeUrl === '/api/figma-plugin/catalog' && req.method === 'GET') {
+        const sectionsMap = new Map();
+        const items = catalog.components.map(c => {
+          sectionsMap.set(c.section, (sectionsMap.get(c.section) || 0) + 1);
+          return {
+            id: c.id,
+            name: c.name,
+            section: c.section,
+            category: c.category,
+            title: c.title,
+            description: c.description,
+            tech: c.tech,
+            tags: c.tags || [],
+            aspectRatio: c.aspectRatio || '16 / 10'
+          };
+        });
+        const sections = Array.from(sectionsMap.entries()).map(([name, count]) => ({ name, count }));
+        return sendJson(
+          req,
+          res,
+          config,
+          200,
+          {
+            totalComponents: items.length,
+            mcpUrl,
+            sections,
+            components: items
+          },
+          figmaCorsHeaders
+        );
+      }
+
+      // 14C. Return live-renderable preview HTML bundle (with WebGL preserveDrawingBuffer + absolute asset base)
+      if (safeUrl.startsWith('/api/figma-plugin/preview/') && req.method === 'GET') {
+        const compId = safeUrl.slice('/api/figma-plugin/preview/'.length);
+        const comp = catalog.byId.get(compId);
+        if (!comp) {
+          return sendJson(req, res, config, 404, { error: 'Component not found' }, figmaCorsHeaders);
+        }
+        let previewHtml = compileComponentHtml(comp, null, { forIframe: true, captureWebGL: true });
+        // Rewrite relative base URL so carousel images load over HTTPS inside Figma plugin srcdoc iframe
+        const htmlDirRel = path.posix.dirname(String(comp.htmlPath || '').replace(/\\/g, '/'));
+        const encodedDir = htmlDirRel
+          .split('/')
+          .filter(Boolean)
+          .map(seg => encodeURIComponent(seg))
+          .join('/');
+        const baseHref = `${publicBase}/${encodedDir}/`;
+        if (/<head[^>]*>/i.test(previewHtml)) {
+          previewHtml = previewHtml.replace(/<head([^>]*)>/i, `<head$1><base href="${baseHref}">`);
+        } else {
+          previewHtml = `<base href="${baseHref}">` + previewHtml;
+        }
+        return sendJson(
+          req,
+          res,
+          config,
+          200,
+          {
+            id: comp.id,
+            name: comp.name,
+            section: comp.section,
+            category: comp.category,
+            title: comp.title,
+            description: comp.description,
+            tech: comp.tech,
+            mcpUrl,
+            previewHtml
+          },
+          figmaCorsHeaders
+        );
+      }
+
+      // 14D. Return clean TSX or HTML code directly inside Figma plugin
+      if (safeUrl.startsWith('/api/figma-plugin/code/') && req.method === 'GET') {
+        const compId = safeUrl.slice('/api/figma-plugin/code/'.length);
+        const comp = catalog.byId.get(compId);
+        if (!comp) {
+          return sendJson(req, res, config, 404, { error: 'Component not found' }, figmaCorsHeaders);
+        }
+        const format = String(fullUrl.searchParams.get('format') || 'tsx').toLowerCase() === 'html' ? 'html' : 'tsx';
+        const html = compileComponentHtml(comp, null, { forIframe: false });
+        if (format === 'tsx') {
+          const reactOut = convertHtmlToReactTsx(html, {
+            section: comp.section,
+            name: comp.name,
+            id: comp.id
+          });
+          return sendJson(
+            req,
+            res,
+            config,
+            200,
+            {
+              id: comp.id,
+              format: 'tsx',
+              componentName: reactOut.componentName,
+              filename: reactOut.filename,
+              code: reactOut.tsx
+            },
+            figmaCorsHeaders
+          );
+        }
+        return sendJson(
+          req,
+          res,
+          config,
+          200,
+          {
+            id: comp.id,
+            format: 'html',
+            filename: `${comp.section}-${comp.name.replace(/\s+/g, '-')}.html`,
+            code: html
+          },
+          figmaCorsHeaders
+        );
+      }
+
+      return sendJson(req, res, config, 404, { error: 'Unknown Figma plugin endpoint' }, figmaCorsHeaders);
+    }
+
     return sendJson(req, res, config, 404, { error: 'Unknown API endpoint' });
   }
 
@@ -1399,9 +1580,10 @@ function createAppServer(configOverrides = {}, deps = {}) {
           'Content-Length': stat.size,
           'Content-Type': contentType
         };
-        if (ext === '.mp4' || ext === '.jpg' || ext === '.jpeg' || ext === '.png' || ext === '.webp') {
+        if (ext === '.mp4' || ext === '.jpg' || ext === '.jpeg' || ext === '.png' || ext === '.webp' || ext === '.gif' || ext === '.svg') {
           headers['Accept-Ranges'] = 'bytes';
           headers['Cache-Control'] = 'public, max-age=300';
+          headers['Access-Control-Allow-Origin'] = '*';
         }
         res.writeHead(200, applySecurityHeaders(req, res, config, headers));
         if (req.method === 'HEAD') return res.end();

@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FrameVault for Figma</title>
+<style>
+  :root {
+    --bg: #09090d;
+    --surface: #121218;
+    --surface-2: #191922;
+    --border: rgba(255, 255, 255, 0.09);
+    --border-strong: rgba(255, 255, 255, 0.18);
+    --text: #f4f4f6;
+    --muted: #9393a3;
+    --accent: #ffffff;
+    --accent-fg: #09090d;
+    --green: #4ade80;
+    --red: #f87171;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 12px;
+    overflow: hidden;
+  }
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: #0d0d12;
+    flex-shrink: 0;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: -0.02em;
+  }
+  .brand-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    background: linear-gradient(135deg, #fff 0%, #8e8ea8 100%);
+    color: #09090d;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 800;
+  }
+  .badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(74, 222, 128, 0.12);
+    color: var(--green);
+    border: 1px solid rgba(74, 222, 128, 0.25);
+    font-weight: 600;
+  }
+  .icon-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .icon-btn:hover { color: var(--text); border-color: var(--border-strong); }
+
+  /* Auth View */
+  .auth-view {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 24px 20px;
+    gap: 14px;
+  }
+  .auth-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .auth-title { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+  .auth-sub { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 11px; color: var(--muted); font-weight: 500; }
+  .input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 11px;
+    color: var(--text);
+    font-size: 12px;
+    outline: none;
+  }
+  .input:focus { border-color: var(--border-strong); }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-fg);
+    border: none;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-secondary {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-secondary:hover { border-color: var(--border-strong); }
+  .err-msg { color: var(--red); font-size: 11px; min-height: 14px; }
+  .helper-link { color: var(--muted); font-size: 11px; text-align: center; }
+  .helper-link a { color: #fff; text-decoration: underline; }
+
+  /* Main Workspace View */
+  .main-view {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .preview-panel {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    background: #0c0c11;
+    flex-shrink: 0;
+  }
+  .stage-wrap {
+    position: relative;
+    width: 100%;
+    height: 196px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #050508;
+    border: 1px solid var(--border);
+  }
+  .stage-wrap iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+    background: #050508;
+  }
+  .stage-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 12px;
+    background: rgba(5, 5, 8, 0.72);
+    pointer-events: none;
+  }
+  .stage-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    gap: 8px;
+  }
+  .stage-title {
+    font-weight: 600;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .stage-sub {
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .size-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 8px;
+  }
+  .size-pill {
+    flex: 1;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 4px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+  }
+  .size-pill.active {
+    background: #fff;
+    color: #09090d;
+    border-color: #fff;
+  }
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  /* Filter & List */
+  .controls {
+    padding: 8px 12px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .pills {
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+  .pills::-webkit-scrollbar { height: 0; }
+  .pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 999px;
+    padding: 4px 9px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    text-transform: capitalize;
+  }
+  .pill.active {
+    background: #fff;
+    color: #09090d;
+    border-color: #fff;
+    font-weight: 700;
+  }
+  .list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px 14px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 7px;
+    align-content: start;
+  }
+  .item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 9px 10px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .item:hover { border-color: var(--border-strong); background: var(--surface-2); }
+  .item.active { border-color: #fff; background: #1e1e29; }
+  .item-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .item-name {
+    font-weight: 600;
+    font-size: 11.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .item-sec {
+    font-size: 9.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .item-tech {
+    font-size: 10px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-dot">FV</span>
+      <span>FrameVault</span>
+      <span id="countBadge" class="badge hidden">300</span>
+    </div>
+    <div style="display:flex; gap:6px; align-items:center;">
+      <button id="signOutBtn" class="icon-btn hidden">Sign out</button>
+    </div>
+  </div>
+
+  <!-- Sign-In Screen -->
+  <div id="authView" class="auth-view">
+    <div class="auth-card">
+      <div class="auth-title">Connect FrameVault to Figma</div>
+      <div class="auth-sub">
+        Enter your FrameVault All-Access license key to preview all 300 animated WebGL shaders, 3D orbs, cubes, and carousels live inside Figma — with automatic MCP handover.
+      </div>
+      <div class="field">
+        <label for="licenseInput">License Key</label>
+        <input id="licenseInput" class="input" type="password" placeholder="OK-PRO-XXXX-XXXX-XXXX" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="serverInput">FrameVault Server URL</label>
+        <input id="serverInput" class="input" type="text" value="https://framevault-qtim.onrender.com" />
+      </div>
+      <div id="authErr" class="err-msg"></div>
+      <button id="connectBtn" class="btn-primary">Connect & Load Library</button>
+      <div class="helper-link">
+        Need a license key? Get All-Access ($4.99) at
+        <a href="https://framevault-qtim.onrender.com" target="_blank" rel="noreferrer">framevault-qtim.onrender.com</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Library Workspace -->
+  <div id="mainView" class="main-view hidden">
+    <div class="preview-panel">
+      <div class="stage-wrap">
+        <iframe id="previewFrame" sandbox="allow-scripts allow-same-origin"></iframe>
+        <div id="stageOverlay" class="stage-overlay">Select a component below to preview live</div>
+      </div>
+
+      <div class="stage-meta">
+        <div style="min-width:0;">
+          <div id="activeTitle" class="stage-title">No component selected</div>
+          <div id="activeSub" class="stage-sub">Live 60fps WebGL / Canvas / DOM preview</div>
+        </div>
+        <button id="updateSelBtn" class="btn-secondary hidden" title="Replace currently selected Figma frame">Update Selected</button>
+      </div>
+
+      <div class="size-row" id="sizeRow">
+        <button class="size-pill active" data-w="1440" data-h="900">1440×900</button>
+        <button class="size-pill" data-w="1200" data-h="800">1200×800</button>
+        <button class="size-pill" data-w="800" data-h="800">800×800</button>
+        <button class="size-pill" data-w="1200" data-h="675">16:9 HD</button>
+      </div>
+
+      <div class="action-row">
+        <button id="insertBtn" class="btn-primary" disabled>Insert into Figma</button>
+        <button id="copyTsxBtn" class="btn-secondary" disabled>Copy TSX</button>
+        <button id="copyPromptBtn" class="btn-secondary" disabled>AI Prompt</button>
+      </div>
+    </div>
+
+    <div class="controls">
+      <input id="searchInput" class="input" type="text" placeholder="Search 300 components (shader, orb, cube, carousel...)" />
+      <div id="sectionPills" class="pills"></div>
+    </div>
+
+    <div id="componentList" class="list"></div>
+  </div>
+</div>
+
+<script>
+  const state = {
+    licenseKey: '',
+    serverUrl: 'https://framevault-qtim.onrender.com',
+    mcpUrl: 'https://framevault-qtim.onrender.com/api/mcp',
+    components: [],
+    sections: [],
+    activeSection: 'all',
+    searchQuery: '',
+    selectedComp: null,
+    selectedBundle: null,
+    selectedFrameVaultId: null,
+    width: 1440,
+    height: 900,
+    busy: false
+  };
+
+  const els = {
+    authView: document.getElementById('authView'),
+    mainView: document.getElementById('mainView'),
+    licenseInput: document.getElementById('licenseInput'),
+    serverInput: document.getElementById('serverInput'),
+    authErr: document.getElementById('authErr'),
+    connectBtn: document.getElementById('connectBtn'),
+    signOutBtn: document.getElementById('signOutBtn'),
+    countBadge: document.getElementById('countBadge'),
+    previewFrame: document.getElementById('previewFrame'),
+    stageOverlay: document.getElementById('stageOverlay'),
+    activeTitle: document.getElementById('activeTitle'),
+    activeSub: document.getElementById('activeSub'),
+    updateSelBtn: document.getElementById('updateSelBtn'),
+    sizeRow: document.getElementById('sizeRow'),
+    insertBtn: document.getElementById('insertBtn'),
+    copyTsxBtn: document.getElementById('copyTsxBtn'),
+    copyPromptBtn: document.getElementById('copyPromptBtn'),
+    searchInput: document.getElementById('searchInput'),
+    sectionPills: document.getElementById('sectionPills'),
+    componentList: document.getElementById('componentList')
+  };
+
+  function postToPlugin(msg) {
+    parent.postMessage({ pluginMessage: msg }, '*');
+  }
+
+  function apiBase() {
+    return String(state.serverUrl || 'https://framevault-qtim.onrender.com').trim().replace(/\/$/, '');
+  }
+
+  async function apiGet(path) {
+    const res = await fetch(apiBase() + path, {
+      method: 'GET',
+      headers: {
+        Authorization: 'Bearer ' + state.licenseKey
+      }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || ('Request failed (' + res.status + ')'));
+    }
+    return data;
+  }
+
+  function showAuth(errText = '') {
+    els.authView.classList.remove('hidden');
+    els.mainView.classList.add('hidden');
+    els.signOutBtn.classList.add('hidden');
+    els.countBadge.classList.add('hidden');
+    els.authErr.textContent = errText;
+  }
+
+  function showMain() {
+    els.authView.classList.add('hidden');
+    els.mainView.classList.remove('hidden');
+    els.signOutBtn.classList.remove('hidden');
+    els.countBadge.classList.remove('hidden');
+    els.countBadge.textContent = state.components.length + ' items';
+  }
+
+  async function connectAndLoad(licenseKey, serverUrl, silent = false) {
+    state.licenseKey = String(licenseKey || '').trim();
+    state.serverUrl = String(serverUrl || 'https://framevault-qtim.onrender.com').trim().replace(/\/$/, '');
+    if (!state.licenseKey) {
+      if (!silent) els.authErr.textContent = 'Enter your FrameVault license key.';
+      return;
+    }
+
+    els.connectBtn.disabled = true;
+    els.connectBtn.textContent = 'Connecting...';
+    els.authErr.textContent = '';
+
+    try {
+      const verify = await apiGet('/api/figma-plugin/verify');
+      state.mcpUrl = verify.mcpUrl || (apiBase() + '/api/mcp');
+      const catalog = await apiGet('/api/figma-plugin/catalog');
+      state.components = catalog.components || [];
+      state.sections = catalog.sections || [];
+      postToPlugin({
+        type: 'save-auth',
+        licenseKey: state.licenseKey,
+        serverUrl: state.serverUrl
+      });
+      renderPills();
+      renderList();
+      showMain();
+
+      // Auto-select matching component if user had a FrameVault node selected in Figma
+      const initial = (state.selectedFrameVaultId && state.components.find(c => c.id === state.selectedFrameVaultId))
+        || state.components[0];
+      if (initial) {
+        selectComponent(initial);
+      }
+    } catch (err) {
+      showAuth(err.message || 'Unable to connect to FrameVault.');
+    } finally {
+      els.connectBtn.disabled = false;
+      els.connectBtn.textContent = 'Connect & Load Library';
+    }
+  }
+
+  function renderPills() {
+    const all = [{ name: 'all', count: state.components.length }, ...state.sections];
+    els.sectionPills.innerHTML = all.map(s => `
+      <button class="pill ${state.activeSection === s.name ? 'active' : ''}" data-sec="${s.name}">
+        ${s.name} (${s.count})
+      </button>
+    `).join('');
+  }
+
+  function getFilteredComponents() {
+    const q = state.searchQuery.trim().toLowerCase();
+    return state.components.filter(c => {
+      if (state.activeSection !== 'all' && c.section !== state.activeSection) return false;
+      if (!q) return true;
+      const hay = `${c.name} ${c.title} ${c.section} ${c.category} ${c.tech} ${(c.tags || []).join(' ')}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }
+
+  function renderList() {
+    const list = getFilteredComponents();
+    if (!list.length) {
+      els.componentList.innerHTML = '<div style="grid-column:1/-1; color:var(--muted); text-align:center; padding:24px;">No components match your search.</div>';
+      return;
+    }
+    els.componentList.innerHTML = list.map(c => `
+      <div class="item ${state.selectedComp && state.selectedComp.id === c.id ? 'active' : ''}" data-id="${c.id}">
+        <div class="item-top">
+          <div class="item-name">${escapeHtml(c.name)}</div>
+          <div class="item-sec">${escapeHtml(c.section)}</div>
+        </div>
+        <div class="item-tech">${escapeHtml(c.tech || c.category || 'Interactive')}</div>
+      </div>
+    `).join('');
+  }
+
+  function escapeHtml(str) {
+    return String(str || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  async function selectComponent(comp) {
+    state.selectedComp = comp;
+    state.selectedBundle = null;
+    els.activeTitle.textContent = `${comp.name} — ${comp.title || comp.section}`;
+    els.activeSub.textContent = `${comp.section.toUpperCase()} • ${comp.tech || 'WebGL / React TSX'}`;
+    els.stageOverlay.textContent = 'Loading live preview...';
+    els.stageOverlay.classList.remove('hidden');
+    els.insertBtn.disabled = true;
+    els.copyTsxBtn.disabled = true;
+    els.copyPromptBtn.disabled = true;
+    renderList();
+
+    try {
+      const bundle = await apiGet('/api/figma-plugin/preview/' + encodeURIComponent(comp.id));
+      if (!state.selectedComp || state.selectedComp.id !== comp.id) return;
+      state.selectedBundle = bundle;
+      els.previewFrame.srcdoc = bundle.previewHtml || '';
+      els.previewFrame.onload = () => {
+        setTimeout(() => {
+          els.stageOverlay.classList.add('hidden');
+          els.insertBtn.disabled = false;
+          els.copyTsxBtn.disabled = false;
+          els.copyPromptBtn.disabled = false;
+        }, 350);
+      };
+    } catch (err) {
+      els.stageOverlay.textContent = 'Preview error: ' + (err.message || 'failed');
+    }
+  }
+
+  /**
+   * Captures a crisp 2x PNG from the live preview iframe (WebGL canvas, 2D canvas, or DOM snapshot).
+   */
+  async function captureLivePreviewPng(targetW, targetH) {
+    const outCanvas = document.createElement('canvas');
+    // Cap capture resolution cleanly for crisp 2x retina without exceeding Figma 4096px image limit
+    const scale = Math.min(2, 2400 / Math.max(targetW, targetH));
+    outCanvas.width = Math.max(320, Math.round(targetW * scale));
+    outCanvas.height = Math.max(200, Math.round(targetH * scale));
+    const ctx = outCanvas.getContext('2d');
+
+    const doc = els.previewFrame.contentDocument;
+    const win = els.previewFrame.contentWindow;
+
+    // 1. Fill stage background color
+    let bgColor = '#09090d';
+    try {
+      if (doc && win && doc.body) {
+        const bodyBg = win.getComputedStyle(doc.body).backgroundColor;
+        const htmlBg = doc.documentElement ? win.getComputedStyle(doc.documentElement).backgroundColor : '';
+        if (bodyBg && bodyBg !== 'rgba(0, 0, 0, 0)' && bodyBg !== 'transparent') bgColor = bodyBg;
+        else if (htmlBg && htmlBg !== 'rgba(0, 0, 0, 0)' && htmlBg !== 'transparent') bgColor = htmlBg;
+      }
+    } catch (_) {}
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, outCanvas.width, outCanvas.height);
+
+    let drewSomething = false;
+
+    if (doc && win) {
+      const iframeW = Math.max(1, els.previewFrame.clientWidth || 416);
+      const iframeH = Math.max(1, els.previewFrame.clientHeight || 196);
+      const sx = outCanvas.width / iframeW;
+      const sy = outCanvas.height / iframeH;
+
+      // 2. Capture all live <canvas> layers (WebGL shaders, Three.js, Canvas 2D)
+      const canvases = Array.from(doc.querySelectorAll('canvas'));
+      for (const c of canvases) {
+        if (!c.width || !c.height) continue;
+        try {
+          const rect = c.getBoundingClientRect();
+          const dx = rect.left * sx;
+          const dy = rect.top * sy;
+          const dw = rect.width * sx;
+          const dh = rect.height * sy;
+          if (dw > 2 && dh > 2) {
+            ctx.drawImage(c, dx, dy, dw, dh);
+            drewSomething = true;
+          }
+        } catch (_) {}
+      }
+
+      // 3. Capture visible <img> layers (Carousels, Cards, Photo galleries)
+      const imgs = Array.from(doc.querySelectorAll('img'));
+      for (const img of imgs) {
+        if (!img.complete || !img.naturalWidth) continue;
+        try {
+          const rect = img.getBoundingClientRect();
+          if (rect.width < 4 || rect.height < 4) continue;
+          ctx.drawImage(img, rect.left * sx, rect.top * sy, rect.width * sx, rect.height * sy);
+          drewSomething = true;
+        } catch (_) {}
+      }
+
+      // 4. Overlay subtle vector text labels if DOM-only component had no canvases/images
+      if (!drewSomething) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `600 ${Math.round(outCanvas.width * 0.032)}px Inter, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(
+          (state.selectedComp && (state.selectedComp.title || state.selectedComp.name)) || 'FrameVault Component',
+          outCanvas.width / 2,
+          outCanvas.height / 2
+        );
+        ctx.fillStyle = '#9ca3af';
+        ctx.font = `400 ${Math.round(outCanvas.width * 0.016)}px Inter, sans-serif`;
+        ctx.fillText(
+          `FrameVault MCP • ${state.selectedComp ? state.selectedComp.id : ''}`,
+          outCanvas.width / 2,
+          outCanvas.height / 2 + Math.round(outCanvas.width * 0.035)
+        );
+      }
+    }
+
+    const blob = await new Promise(resolve => outCanvas.toBlob(resolve, 'image/png'));
+    const buf = await blob.arrayBuffer();
+    return Array.from(new Uint8Array(buf));
+  }
+
+  async function handleInsert(updateSelected = false) {
+    if (!state.selectedComp || state.busy) return;
+    state.busy = true;
+    els.insertBtn.disabled = true;
+    els.insertBtn.textContent = 'Capturing live frame...';
+
+    try {
+      const imageBytes = await captureLivePreviewPng(state.width, state.height);
+      postToPlugin({
+        type: 'insert-component',
+        updateSelected,
+        width: state.width,
+        height: state.height,
+        cornerRadius: 16,
+        asComponent: true,
+        imageBytes,
+        meta: {
+          id: state.selectedComp.id,
+          name: state.selectedComp.name,
+          section: state.selectedComp.section,
+          title: state.selectedComp.title,
+          tech: state.selectedComp.tech,
+          mcpUrl: state.mcpUrl
+        }
+      });
+    } catch (err) {
+      postToPlugin({ type: 'notify', message: 'Capture failed: ' + (err.message || err), error: true });
+      state.busy = false;
+      els.insertBtn.disabled = false;
+      els.insertBtn.textContent = 'Insert into Figma';
+    }
+  }
+
+  function copyTextFallback(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+  }
+
+  // Event Listeners
+  els.connectBtn.addEventListener('click', () => {
+    connectAndLoad(els.licenseInput.value, els.serverInput.value, false);
+  });
+  els.licenseInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') connectAndLoad(els.licenseInput.value, els.serverInput.value, false);
+  });
+
+  els.signOutBtn.addEventListener('click', () => {
+    state.licenseKey = '';
+    els.licenseInput.value = '';
+    postToPlugin({ type: 'clear-auth' });
+    showAuth('');
+  });
+
+  els.sectionPills.addEventListener('click', (e) => {
+    const btn = e.target.closest('.pill');
+    if (!btn) return;
+    state.activeSection = btn.dataset.sec;
+    renderPills();
+    renderList();
+  });
+
+  els.searchInput.addEventListener('input', (e) => {
+    state.searchQuery = e.target.value;
+    renderList();
+  });
+
+  els.componentList.addEventListener('click', (e) => {
+    const card = e.target.closest('.item');
+    if (!card) return;
+    const comp = state.components.find(c => c.id === card.dataset.id);
+    if (comp) selectComponent(comp);
+  });
+
+  els.sizeRow.addEventListener('click', (e) => {
+    const btn = e.target.closest('.size-pill');
+    if (!btn) return;
+    state.width = Number(btn.dataset.w) || 1440;
+    state.height = Number(btn.dataset.h) || 900;
+    els.sizeRow.querySelectorAll('.size-pill').forEach(p => p.classList.toggle('active', p === btn));
+  });
+
+  els.insertBtn.addEventListener('click', () => handleInsert(false));
+  els.updateSelBtn.addEventListener('click', () => handleInsert(true));
+
+  els.copyTsxBtn.addEventListener('click', async () => {
+    if (!state.selectedComp) return;
+    els.copyTsxBtn.disabled = true;
+    try {
+      const data = await apiGet(`/api/figma-plugin/code/${encodeURIComponent(state.selectedComp.id)}?format=tsx`);
+      copyTextFallback(data.code || '');
+      postToPlugin({ type: 'notify', message: `Copied ${data.filename || 'component.tsx'}!` });
+    } catch (err) {
+      postToPlugin({ type: 'notify', message: err.message || 'Failed to copy TSX', error: true });
+    } finally {
+      els.copyTsxBtn.disabled = false;
+    }
+  });
+
+  els.copyPromptBtn.addEventListener('click', () => {
+    if (!state.selectedComp) return;
+    const prompt = `Use FrameVault MCP to fetch component "${state.selectedComp.id}" (${state.selectedComp.title || state.selectedComp.name}) via get_component_code({ id: "${state.selectedComp.id}", format: "tsx" }) and integrate it into my React/Next.js page matching the Figma layout.`;
+    copyTextFallback(prompt);
+    postToPlugin({ type: 'notify', message: 'Copied AI + MCP handover prompt!' });
+  });
+
+  // Messages from Figma sandbox (code.js)
+  window.onmessage = (event) => {
+    const msg = event.data && event.data.pluginMessage;
+    if (!msg) return;
+
+    if (msg.type === 'init-state') {
+      state.selectedFrameVaultId = msg.selectedFrameVaultId || null;
+      els.updateSelBtn.classList.toggle('hidden', !state.selectedFrameVaultId);
+      if (msg.serverUrl) els.serverInput.value = msg.serverUrl;
+      if (msg.licenseKey) {
+        els.licenseInput.value = msg.licenseKey;
+        connectAndLoad(msg.licenseKey, msg.serverUrl || 'https://framevault-qtim.onrender.com', true);
+      } else {
+        showAuth('');
+      }
+    }
+
+    if (msg.type === 'selection-change') {
+      state.selectedFrameVaultId = msg.selectedFrameVaultId || null;
+      els.updateSelBtn.classList.toggle('hidden', !state.selectedFrameVaultId);
+    }
+
+    if (msg.type === 'insert-done') {
+      state.busy = false;
+      els.insertBtn.disabled = false;
+      els.insertBtn.textContent = 'Insert into Figma';
+    }
+  };
+
+  postToPlugin({ type: 'ready' });
+</script>
+</body>
+</html>

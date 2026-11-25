@@ -182,7 +182,7 @@ function initAsset14Runtime(__fvRuntime: ScopedRuntimeContext): void {
         const outerFade = Math.min(1.0, (1.0 - p.u) * 3.5);
         const alpha = Math.min(0.95, (0.28 + throatGlow * 0.68) * depthBright * outerFade);
   
-        let r, g, b;
+        let r: any, g: any, b: any;
         if (throatGlow > 0.45 || p.hueShift > 0.72) {
           r = 185 + Math.round(throatGlow * 65);
           g = 255;

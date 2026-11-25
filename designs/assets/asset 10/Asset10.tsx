@@ -176,7 +176,7 @@ function initAsset10Runtime(__fvRuntime: ScopedRuntimeContext): void {
     }
   
     for (let i = 0; i < COUNT; i++) {
-      let r, theta, yThickness;
+      let r: any, theta: any, yThickness: any;
       const p = Math.random();
   
       if (p < 0.14) {

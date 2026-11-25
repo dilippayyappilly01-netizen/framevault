@@ -93,7 +93,7 @@ function initBackground3Runtime(__fvRuntime: ScopedRuntimeContext): void {
     let cols = 0;
     let rows = 0;
     let spacing = 30;
-    let nodes: any[] = [];
+    let nodes: any = [];
     const shockwaves: any[] = [];
   
     function buildGrid() {
@@ -286,7 +286,7 @@ function initBackground3Runtime(__fvRuntime: ScopedRuntimeContext): void {
         const e = Math.min(1.0, n.energy);
         const radius = 1.65 + e * 3.1;
   
-        let rCol, gCol, bCol, alpha;
+        let rCol: any, gCol: any, bCol: any, alpha: any;
         if (e < 0.03) {
           rCol = baseRgb[0];
           gCol = baseRgb[1];

@@ -176,7 +176,7 @@ function initOrb5Runtime(__fvRuntime: ScopedRuntimeContext): void {
     while (idx < TOTAL) {
       const isHotCluster = idx < 10500;
   
-      let x, y, z, heat, size, layer;
+      let x: any, y: any, z: any, heat: any, size: any, layer: any;
   
       if (!isHotCluster) {
         // Outer spherical shell + sparse internal dust veil

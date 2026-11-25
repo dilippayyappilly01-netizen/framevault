@@ -436,29 +436,95 @@ function annotateRuntimeScriptForTs(code) {
       }
     }
 
-    // Empty array initializers: `const foo = []` or `let foo = []` -> `: any[] = []`
+    // Variable declarations: annotate empty arrays (`= []`), `let x;`, and `let x = null`
+    // including comma-separated lists like `let w = 0, traces = [], signals = [];`
     if (
       (src.startsWith('const ', i) || src.startsWith('let ', i)) &&
       !/[a-zA-Z0-9_$]/.test(src[i - 1] || '')
     ) {
-      const sub = src.slice(i);
-      const arrM = sub.match(/^(const|let)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*\[\s*\]/);
-      if (arrM) {
-        out += `${arrM[1]} ${arrM[2]}: any[] = []`;
-        i += arrM[0].length;
-        continue;
+      const kw = src.startsWith('const ', i) ? 'const' : 'let';
+      let j = i + kw.length;
+      let depth = 0;
+      let inStr = null;
+      while (j < len) {
+        const c = src[j];
+        if (inStr) {
+          if (c === '\\') { j += 2; continue; }
+          if (c === inStr) inStr = null;
+          j++;
+          continue;
+        }
+        if (c === "'" || c === '"' || c === '`') { inStr = c; j++; continue; }
+        if (c === '(' || c === '[' || c === '{') depth++;
+        else if (c === ')' || c === ']' || c === '}') {
+          if (depth === 0) break;
+          depth--;
+        } else if (depth === 0 && (c === ';' || c === '\n')) {
+          break;
+        }
+        j++;
       }
-      const uninitM = sub.match(/^let\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*;/);
-      if (uninitM) {
-        out += `let ${uninitM[1]}: any;`;
-        i += uninitM[0].length;
-        continue;
-      }
-      const nullInitM = sub.match(/^let\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*null\b/);
-      if (nullInitM) {
-        out += `let ${nullInitM[1]}: any = null`;
-        i += nullInitM[0].length;
-        continue;
+      const rawDeclList = src.slice(i + kw.length, j);
+      // Only rewrite if it contains at least one untyped `= []`, `= null`, or uninitialized `let` declarator
+      // and is not a `for (let x of ...)` / `for (let x in ...)` header.
+      if (!/^\s*[a-zA-Z_$][a-zA-Z0-9_$]*\s+(of|in)\b/.test(rawDeclList)) {
+        const parts = [];
+        let cur = '';
+        let pDepth = 0;
+        let pStr = null;
+        for (let k = 0; k < rawDeclList.length; k++) {
+          const c = rawDeclList[k];
+          if (pStr) {
+            cur += c;
+            if (c === '\\' && k + 1 < rawDeclList.length) { cur += rawDeclList[++k]; continue; }
+            if (c === pStr) pStr = null;
+            continue;
+          }
+          if (c === "'" || c === '"' || c === '`') { pStr = c; cur += c; continue; }
+          if (c === '(' || c === '[' || c === '{') pDepth++;
+          else if (c === ')' || c === ']' || c === '}') pDepth--;
+          if (c === ',' && pDepth === 0) {
+            parts.push(cur);
+            cur = '';
+          } else {
+            cur += c;
+          }
+        }
+        parts.push(cur);
+
+        let changed = false;
+        const rewritten = parts.map(part => {
+          const lead = part.match(/^\s*/)[0];
+          const trail = part.match(/\s*$/)[0];
+          const trimmed = part.trim();
+          if (!trimmed || trimmed.includes(':')) return part;
+
+          const arrM = trimmed.match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*\[\s*\]$/);
+          if (arrM) {
+            changed = true;
+            const arrType = kw === 'let' ? 'any' : 'any[]';
+            return `${lead}${arrM[1]}: ${arrType} = []${trail}`;
+          }
+          if (kw === 'let') {
+            const nullM = trimmed.match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*null$/);
+            if (nullM) {
+              changed = true;
+              return `${lead}${nullM[1]}: any = null${trail}`;
+            }
+            const uninitM = trimmed.match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)$/);
+            if (uninitM) {
+              changed = true;
+              return `${lead}${uninitM[1]}: any${trail}`;
+            }
+          }
+          return part;
+        });
+
+        if (changed) {
+          out += `${kw}${rewritten.join(',')}`;
+          i = j;
+          continue;
+        }
       }
     }
 

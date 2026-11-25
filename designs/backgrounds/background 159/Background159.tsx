@@ -47,7 +47,7 @@ function initBackground159Runtime(__fvRuntime: ScopedRuntimeContext): void {
     const canvas = document.getElementById('stageCanvas');
     const ctx = canvas.getContext('2d'); if (!ctx) return;
     const GLYPHS = '0123456789ABCDEF/<>[]{}*+-';
-    let w = 0, h = 0, dpr = 1, cols = 0, drops = [], ptrX = -999, ptrY = -999;
+    let w = 0, h = 0, dpr = 1, cols = 0, drops: any = [], ptrX = -999, ptrY = -999;
     const fs = 16;
     function resize() {
       dpr = Math.min(window.devicePixelRatio || 1, 2);

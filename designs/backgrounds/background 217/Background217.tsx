@@ -46,7 +46,7 @@ function initBackground217Runtime(__fvRuntime: ScopedRuntimeContext): void {
   (() => {
     const canvas = document.getElementById('stageCanvas');
     const ctx = canvas.getContext('2d'); if (!ctx) return;
-    let w = 0, h = 0, dpr = 1, cols = 14, rows = 9, pts = [], ptrX = 0, ptrY = 0;
+    let w = 0, h = 0, dpr = 1, cols = 14, rows = 9, pts: any = [], ptrX = 0, ptrY = 0;
     function build() {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       w = window.innerWidth; h = window.innerHeight;

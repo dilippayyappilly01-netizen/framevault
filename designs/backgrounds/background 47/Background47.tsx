@@ -82,7 +82,7 @@ function initBackground47Runtime(__fvRuntime: ScopedRuntimeContext): void {
   
     let width = 0, height = 0, dpr = 1;
     let hexR = 26;
-    let tiles: any[] = [];
+    let tiles: any = [];
     const ripples: any[] = [];
   
     function build() {

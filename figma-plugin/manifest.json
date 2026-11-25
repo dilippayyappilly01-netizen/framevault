@@ -1,0 +1,27 @@
+{
+  "name": "FrameVault — 300+ Animated Components & Shaders",
+  "id": "framevault-figma-plugin",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "documentAccess": "dynamic-page",
+  "editorType": [
+    "figma",
+    "figjam"
+  ],
+  "networkAccess": {
+    "allowedDomains": [
+      "https://framevault-qtim.onrender.com",
+      "https://fonts.googleapis.com",
+      "https://fonts.gstatic.com",
+      "https://cdnjs.cloudflare.com",
+      "https://cdn.jsdelivr.net",
+      "https://unpkg.com"
+    ],
+    "devAllowedDomains": [
+      "http://localhost:3000",
+      "http://127.0.0.1:3000"
+    ],
+    "reasoning": "Connects to your FrameVault library to authenticate your license key, preview live WebGL/HTML components, and insert tagged frames + code into Figma."
+  }
+}

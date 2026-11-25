@@ -81,7 +81,7 @@ function initBackground88Runtime(__fvRuntime: ScopedRuntimeContext): void {
     const rgbB = parseHex(ACCENT_B);
   
     let width = 0, height = 0, dpr = 1;
-    let nodes: any[] = [];
+    let nodes: any = [];
     const shocks: any[] = [];
   
     function build() {
