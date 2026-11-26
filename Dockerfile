@@ -2,13 +2,16 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Copy application files (zero root npm dependencies — pure Node 22 built-ins + SQLite)
-COPY package.json server.js index.html app.js canvas.js styles.css favicon.svg components-data.js ./
-COPY backend ./backend
+# Copy heavy / rarely-changed assets first to maximize Docker layer caching on Render
+COPY package.json favicon.svg components-data.js ./
 COPY designs ./designs
 COPY .agent ./.agent
 COPY .claude ./.claude
 COPY mcp-server/dist ./mcp-server/dist
+
+# Copy frequently updated server and frontend files last for fast rebuilds
+COPY backend ./backend
+COPY server.js index.html app.js canvas.js styles.css ./
 
 RUN mkdir -p /app/data
 
