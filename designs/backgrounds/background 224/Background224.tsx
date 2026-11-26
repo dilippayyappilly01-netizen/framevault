@@ -168,6 +168,14 @@ export function Background224({ className, style, width = '100%', height = '100%
       : null;
     ro?.observe(root);
 
+    // If mounted inside an unsized (0px) parent (e.g. default Vite/Bolt #root), expand to viewport so canvas never renders 0x0
+    if (root.clientHeight < 2) {
+      root.style.height = '100vh';
+    }
+    if (root.clientWidth < 2) {
+      root.style.width = '100vw';
+    }
+
     initBackground224Runtime({
       root,
       document: scopedDoc,

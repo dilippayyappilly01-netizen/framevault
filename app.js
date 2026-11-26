@@ -3501,7 +3501,7 @@
 
     const actionLine = isHtml
       ? `Add this exact standalone HTML/WebGL component ("${comp.displayTitle}") to my page:`
-      : `Create \`src/components/${filename}\` with the exact code below and render \`<${compName} />\` on my page:`;
+      : `Create \`src/components/${filename}\` with the exact code below and render it inside a full-viewport container (\`<div style={{ width: '100vw', height: '100vh' }}><${compName} /></div>\`) on my page:`;
 
     const lines = [
       `Add this exact FrameVault component ("${comp.displayTitle}") to my project. ${fwLine}`,
