@@ -3344,8 +3344,14 @@
       ? `port it cleanly to ${framework}, `
       : `adapt it to my project's framework, `;
 
+    const origin = (window.location && window.location.origin) || '';
+    const isLocalHost = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(origin);
+    const mcpEndpointUrl = (!isLocalHost && origin)
+      ? `${origin.replace(/\/$/, '')}/api/mcp`
+      : 'https://framevault-qtim.onrender.com/api/mcp';
+
     const lines = [
-      `Use the framevault-ui MCP server: read ui://guidelines/design-system, call ${frameworkArg} to fetch "${comp.displayTitle}", and follow the returned Remix Prompt to ${frameworkClause}rendering ONLY the pure visual/animated component itself with NO invented headlines, captions, or extra text unless I explicitly ask for text, while preserving 60fps animations.`
+      `Connect to the framevault-ui MCP server at ${mcpEndpointUrl} (Bearer token auth), read ui://guidelines/design-system, call ${frameworkArg} to fetch "${comp.displayTitle}", and follow the returned Remix Prompt to ${frameworkClause}rendering ONLY the pure visual/animated component itself with NO invented headlines, captions, or extra text unless I explicitly ask for text, while preserving 60fps animations.`
     ];
 
     if (options.includeStudioEdits) {
