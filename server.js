@@ -1097,7 +1097,7 @@ function createAppServer(configOverrides = {}, deps = {}) {
 
         const baseConfig = {
           mcpServers: {
-            'originkit-ui': {
+            'framevault-ui': {
               command: process.execPath || 'node',
               args: [mcpEntry],
               env: {
@@ -1111,8 +1111,8 @@ function createAppServer(configOverrides = {}, deps = {}) {
           ready: mcpBuilt,
           indexedCount,
           skillPaths: [
-            '.agent/skills/originkit-ui/SKILL.md',
-            '.claude/skills/originkit-ui/SKILL.md'
+            '.agent/skills/framevault-ui/SKILL.md',
+            '.claude/skills/framevault-ui/SKILL.md'
           ],
           tools: [
             { name: 'search_components', desc: 'Natural-language search across filenames, titles, engines, tags & comments' },
@@ -1151,7 +1151,7 @@ function createAppServer(configOverrides = {}, deps = {}) {
               codex: {
                 label: 'Codex (TOML)',
                 fileHint: '~/.codex/config.toml',
-                json: `[mcp_servers.originkit-ui]\ncommand = "node"\nargs = ["${mcpEntry.replace(/\\/g, '/')}"]\n\n[mcp_servers.originkit-ui.env]\nORIGINKIT_DESIGNS_DIR = "${designsDir.replace(/\\/g, '/')}"`
+                json: `[mcp_servers.framevault-ui]\ncommand = "node"\nargs = ["${mcpEntry.replace(/\\/g, '/')}"]\n\n[mcp_servers.framevault-ui.env]\nORIGINKIT_DESIGNS_DIR = "${designsDir.replace(/\\/g, '/')}"`
               }
             }
           })),
@@ -1180,7 +1180,7 @@ function createAppServer(configOverrides = {}, deps = {}) {
           const displayBearerKey = license.isOwner ? '<YOUR_OWNER_OR_LICENSE_KEY>' : license.licenseKey;
           const remoteConfig = {
             mcpServers: {
-              'originkit-ui': {
+              'framevault-ui': {
                 url: remoteMcpUrl,
                 headers: {
                   Authorization: `Bearer ${displayBearerKey}`
@@ -1190,7 +1190,7 @@ function createAppServer(configOverrides = {}, deps = {}) {
           };
           const claudeRemoteConfig = {
             mcpServers: {
-              'originkit-ui': {
+              'framevault-ui': {
                 type: 'http',
                 url: remoteMcpUrl,
                 headers: {
@@ -1201,7 +1201,7 @@ function createAppServer(configOverrides = {}, deps = {}) {
           };
           const antigravityRemoteConfig = {
             mcpServers: {
-              'originkit-ui': {
+              'framevault-ui': {
                 serverUrl: remoteMcpUrl,
                 headers: {
                   Authorization: `Bearer ${displayBearerKey}`
@@ -1210,10 +1210,10 @@ function createAppServer(configOverrides = {}, deps = {}) {
             }
           };
           const codexToml = [
-            `[mcp_servers.originkit-ui]`,
+            `[mcp_servers.framevault-ui]`,
             `url = "${remoteMcpUrl}"`,
             ``,
-            `[mcp_servers.originkit-ui.http_headers]`,
+            `[mcp_servers.framevault-ui.http_headers]`,
             `Authorization = "Bearer ${displayBearerKey}"`
           ].join('\n');
           const parsedUnlocked = JSON.parse(mcpInfoCache.unlocked.raw.toString('utf8'));

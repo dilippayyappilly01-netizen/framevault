@@ -20,7 +20,7 @@ function resolvePaths() {
 const { workspaceRoot, componentsDir } = resolvePaths();
 const library = new ComponentLibraryIndex(workspaceRoot, componentsDir);
 const server = new McpServer({
-    name: "originkit-ui-mcp",
+    name: "framevault-ui-mcp",
     version: "1.0.0",
 });
 // 1. search_components tool
@@ -166,9 +166,9 @@ async function main() {
     const initialCount = library.getAll(false).length;
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error(`[originkit-ui-mcp] Indexed ${initialCount} components from ${componentsDir}`);
+    console.error(`[framevault-ui-mcp] Indexed ${initialCount} components from ${componentsDir}`);
 }
 main().catch((err) => {
-    console.error("[originkit-ui-mcp] Fatal startup error:", err);
+    console.error("[framevault-ui-mcp] Fatal startup error:", err);
     process.exit(1);
 });

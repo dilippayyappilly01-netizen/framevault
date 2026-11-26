@@ -2229,7 +2229,7 @@
       studioAiPromptBtn,
       'AI Prompt',
       unlocked,
-      'Open AI Remix Prompt builder (originkit-ui MCP)',
+      'Open AI Remix Prompt builder (framevault-ui MCP)',
       `Locked — Pay ${priceLabel} to unlock AI Remix Prompts & MCP code access`
     );
 
@@ -3345,7 +3345,7 @@
       : `adapt it to my project's framework, `;
 
     const lines = [
-      `Use the originkit-ui MCP server: read ui://guidelines/design-system, call ${frameworkArg} to fetch "${comp.displayTitle}", and follow the returned Remix Prompt to ${frameworkClause}rendering ONLY the pure visual/animated component itself with NO invented headlines, captions, or extra text unless I explicitly ask for text, while preserving 60fps animations.`
+      `Use the framevault-ui MCP server: read ui://guidelines/design-system, call ${frameworkArg} to fetch "${comp.displayTitle}", and follow the returned Remix Prompt to ${frameworkClause}rendering ONLY the pure visual/animated component itself with NO invented headlines, captions, or extra text unless I explicitly ask for text, while preserving 60fps animations.`
     ];
 
     if (options.includeStudioEdits) {
@@ -3447,7 +3447,7 @@
     const editsLabel = document.getElementById('aiPromptIncludeEditsLabel');
 
     const mcpId = formatMcpComponentId(comp);
-    if (badgeEl) badgeEl.textContent = `originkit-ui · ${mcpId}`;
+    if (badgeEl) badgeEl.textContent = `framevault-ui · ${mcpId}`;
     if (titleEl) titleEl.textContent = `AI Prompt — ${comp.displayTitle}`;
 
     const overrides = collectStudioOverrides(comp);
