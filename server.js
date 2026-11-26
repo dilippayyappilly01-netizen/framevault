@@ -216,6 +216,7 @@ function createAppServer(configOverrides = {}, deps = {}) {
   const catalog = loadCatalog(config.catalogFile);
   const rateLimiter = new RateLimiter();
   const previewStore = createPreviewStore();
+  const canvasPreviewStore = createPreviewStore(60, 10 * 60_000);
   const staticAssetCache = new Map();
   let mcpInfoCache = null;
   const startedAt = Date.now();
@@ -970,6 +971,216 @@ function createAppServer(configOverrides = {}, deps = {}) {
       return res.end(outContent);
     }
 
+    // Helper: Build composed Website Canvas HTML (mode: 'preview' uses same-origin /api/preview/:id; 'export' embeds compiled srcdoc)
+    function escapeCanvasHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function buildCanvasBlockHtml(l) {
+      const e = escapeCanvasHtml;
+      if (l.blockType === 'navbar') {
+        const links = String(l.navLinks || '')
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean);
+        return `<div class="ok-cb-navbar" style="background:${e(l.bgColor)};border:1px solid ${e(l.borderColor)};color:${e(l.textColor)};border-radius:${Number(l.borderRadius) || 0}px;backdrop-filter:blur(${Number(l.backdropBlur) || 0}px);-webkit-backdrop-filter:blur(${Number(l.backdropBlur) || 0}px);padding:0 ${Number(l.padding) || 20}px;"><div class="ok-cb-nav-brand">${e(l.brandText || 'Brand')}</div><div class="ok-cb-nav-links">${links.map(lk => `<span>${e(lk)}</span>`).join('')}</div>${l.ctaText ? `<span class="ok-cb-nav-cta" style="background:${e(l.ctaBg || '#0b4dff')};">${e(l.ctaText)}</span>` : ''}</div>`;
+      }
+      if (l.blockType === 'heading') {
+        return `<div class="ok-cb-heading" style="color:${e(l.textColor)};font-size:${Number(l.fontSize) || 48}px;font-weight:${e(l.fontWeight || '700')};text-align:${e(l.textAlign || 'center')};background:${e(l.bgColor || 'transparent')};border-radius:${Number(l.borderRadius) || 0}px;padding:${Number(l.padding) || 8}px;">${e(l.text || 'Heading')}</div>`;
+      }
+      if (l.blockType === 'text') {
+        return `<div class="ok-cb-text" style="color:${e(l.textColor)};font-size:${Number(l.fontSize) || 16}px;font-weight:${e(l.fontWeight || '400')};text-align:${e(l.textAlign || 'center')};background:${e(l.bgColor || 'transparent')};border-radius:${Number(l.borderRadius) || 0}px;padding:${Number(l.padding) || 8}px;">${e(l.text || '')}</div>`;
+      }
+      if (l.blockType === 'button') {
+        return `<div class="ok-cb-button" style="background:${e(l.bgColor || '#0b4dff')};color:${e(l.textColor || '#ffffff')};border:1px solid ${e(l.borderColor || 'transparent')};border-radius:${l.borderRadius !== undefined ? Number(l.borderRadius) : 999}px;font-size:${Number(l.fontSize) || 15}px;font-weight:${e(l.fontWeight || '600')};">${e(l.text || 'Button')}</div>`;
+      }
+      return `<div class="ok-cb-card" style="background:${e(l.bgColor)};border:1px solid ${e(l.borderColor)};color:${e(l.textColor)};border-radius:${l.borderRadius !== undefined ? Number(l.borderRadius) : 20}px;backdrop-filter:blur(${Number(l.backdropBlur) || 0}px);-webkit-backdrop-filter:blur(${Number(l.backdropBlur) || 0}px);padding:${Number(l.padding) || 24}px;text-align:${e(l.textAlign || 'left')};"><div class="ok-cb-card-title">${e(l.title || 'Card Title')}</div><div class="ok-cb-card-body" style="font-size:${Number(l.fontSize) || 14}px;">${e(l.text || '')}</div></div>`;
+    }
+
+    function buildComposedCanvasHtml(payload, mode, originBase) {
+      const e = escapeCanvasHtml;
+      const pageBg = String(payload?.pageBg || '#09090b').slice(0, 80);
+      const pageWidth = Math.max(320, Math.min(2560, Number(payload?.pageWidth) || 1280));
+      const pageHeight = Math.max(400, Math.min(6000, Number(payload?.pageHeight) || 1200));
+      const rawLayers = Array.isArray(payload?.layers) ? payload.layers.slice(0, 80) : [];
+      const sorted = rawLayers
+        .filter(l => l && l.visible !== false)
+        .sort((a, b) => (Number(a.zIndex) || 0) - (Number(b.zIndex) || 0));
+
+      const nodesHtml = sorted.map(l => {
+        const x = Math.round(Number(l.x) || 0);
+        const y = Math.round(Number(l.y) || 0);
+        const w = Math.max(20, Math.round(Number(l.w) || 200));
+        const h = Math.max(20, Math.round(Number(l.h) || 100));
+        const z = Math.round(Number(l.zIndex) || 1);
+        const op = Math.max(0, Math.min(1, (l.opacity !== undefined ? Number(l.opacity) : 100) / 100));
+        const br = Math.max(0, Math.round(Number(l.borderRadius) || 0));
+        const style = [
+          'position:absolute',
+          `left:${x}px`,
+          `top:${y}px`,
+          `width:${w}px`,
+          `height:${h}px`,
+          `z-index:${z}`,
+          `opacity:${op.toFixed(2)}`,
+          `border-radius:${br}px`,
+          'overflow:hidden'
+        ];
+        const allowedBlends = new Set(['normal', 'screen', 'lighten', 'multiply', 'overlay', 'plus-lighter']);
+        if (l.blendMode && allowedBlends.has(l.blendMode) && l.blendMode !== 'normal') {
+          style.push(`mix-blend-mode:${l.blendMode}`);
+        }
+
+        if (l.kind === 'component') {
+          const comp = catalog.byId.get(String(l.compId || ''));
+          if (!comp) return '';
+          const filters = [];
+          if (Number(l.hueRotate)) filters.push(`hue-rotate(${Number(l.hueRotate)}deg)`);
+          if (l.brightness !== undefined && Number(l.brightness) !== 100) filters.push(`brightness(${Number(l.brightness)}%)`);
+          if (l.saturate !== undefined && Number(l.saturate) !== 100) filters.push(`saturate(${Number(l.saturate)}%)`);
+          if (Number(l.blur)) filters.push(`blur(${Number(l.blur)}px)`);
+          if (filters.length) style.push(`filter:${filters.join(' ')}`);
+          const pe = l.interactive === false ? 'none' : 'auto';
+
+          if (mode === 'export') {
+            let compiled = compileComponentHtml(comp, l.controlParameterSet || null, { forIframe: false });
+            if (originBase && comp.folderPath && !/<base\s/i.test(compiled)) {
+              const baseHref = `${originBase.replace(/\/$/, '')}/${encodeURI(comp.folderPath)}`;
+              if (/<head[^>]*>/i.test(compiled)) {
+                compiled = compiled.replace(/<head([^>]*)>/i, `<head$1><base href="${e(baseHref)}">`);
+              } else {
+                compiled = `<base href="${e(baseHref)}">${compiled}`;
+              }
+            }
+            return `    <!-- FrameVault Component: ${e(comp.id)} (${e(comp.displayTitle || comp.name)}) -->
+    <div style="${style.join(';')}">
+      <iframe srcdoc="${e(compiled)}" style="width:100%;height:100%;border:0;display:block;pointer-events:${pe};" sandbox="allow-scripts allow-same-origin"></iframe>
+    </div>`;
+          }
+
+          // Same-origin live preview mode
+          const src = `/api/preview/${encodeURIComponent(comp.id)}`;
+          return `    <div style="${style.join(';')}">
+      <iframe src="${e(src)}" style="width:100%;height:100%;border:0;display:block;pointer-events:${pe};" sandbox="allow-scripts allow-same-origin" loading="lazy"></iframe>
+    </div>`;
+        }
+
+        return `    <div style="${style.join(';')}">${buildCanvasBlockHtml(l)}</div>`;
+      }).filter(Boolean).join('\n');
+
+      return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FrameVault Canvas Website Design</title>
+  <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      min-height: 100vh;
+      background: ${e(pageBg)};
+      font-family: 'General Sans', Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #ffffff;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    .fv-stage-wrap { width: 100%; display: flex; justify-content: center; }
+    .fv-page {
+      position: relative;
+      width: ${pageWidth}px;
+      min-height: ${pageHeight}px;
+      background: ${e(pageBg)};
+      overflow: hidden;
+    }
+    .ok-cb-navbar { width:100%; height:100%; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+    .ok-cb-nav-brand { font-weight:700; font-size:15px; letter-spacing:-0.02em; white-space:nowrap; }
+    .ok-cb-nav-links { display:flex; align-items:center; gap:24px; font-size:13.5px; opacity:0.85; }
+    .ok-cb-nav-cta { padding:8px 16px; border-radius:999px; font-size:13px; font-weight:600; color:#fff; white-space:nowrap; }
+    .ok-cb-heading { width:100%; height:100%; line-height:1.06; letter-spacing:-0.035em; word-break:break-word; }
+    .ok-cb-text { width:100%; height:100%; line-height:1.55; }
+    .ok-cb-button { width:100%; height:100%; display:flex; align-items:center; justify-content:center; cursor:pointer; }
+    .ok-cb-card { width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; gap:10px; }
+    .ok-cb-card-title { font-size:18px; font-weight:650; letter-spacing:-0.02em; }
+    .ok-cb-card-body { line-height:1.5; opacity:0.78; }
+  </style>
+</head>
+<body>
+  <div class="fv-stage-wrap">
+    <main class="fv-page">
+${nodesHtml}
+    </main>
+  </div>
+</body>
+</html>`;
+    }
+
+    // 11b. Same-Origin Live Canvas Preview (POST & GET /api/preview-canvas)
+    if (safeUrl === '/api/preview-canvas') {
+      if (req.method === 'POST') {
+        if (!enforceRateLimit(req, res, 'canvas-preview', 60, 60_000)) return;
+        let body;
+        try {
+          body = await readJsonBody(req, 4 * 1024 * 1024);
+        } catch (err) {
+          return sendJson(req, res, config, err.statusCode || 400, { error: err.message });
+        }
+        const previewHtml = buildComposedCanvasHtml(body, 'preview', resolveOrigin(req, config));
+        const token = canvasPreviewStore.set('canvas', previewHtml);
+        return sendJson(req, res, config, 200, {
+          previewUrl: `/api/preview-canvas?token=${encodeURIComponent(token)}`
+        }, { 'Cache-Control': 'no-store' });
+      }
+      if (req.method === 'GET') {
+        const token = fullUrl.searchParams.get('token');
+        const html = canvasPreviewStore.get(token, 'canvas');
+        if (!html) {
+          res.writeHead(404, applySecurityHeaders(req, res, config, { 'Content-Type': 'text/plain; charset=utf-8' }));
+          return res.end('Canvas preview expired. Click Preview again from the FrameVault Canvas.');
+        }
+        const asset = makeCompressedAsset(html);
+        return sendCompressedAsset(req, res, config, asset, 'text/html; charset=utf-8', {
+          'Cache-Control': 'private, no-store'
+        });
+      }
+    }
+
+    // 11c. Licensed Standalone Self-Contained Canvas Export (POST /api/export-canvas)
+    if (safeUrl === '/api/export-canvas' && req.method === 'POST') {
+      const license = verifyLicenseFromRequest(req, db);
+      if (!license) {
+        return sendJson(req, res, config, 402, {
+          error: `All-Access Pass (${config.licensePriceDisplay}) required to export standalone Website Canvas HTML with embedded components.`,
+          priceCents: config.licensePriceCents,
+          price: config.licensePriceDisplay
+        });
+      }
+      if (!enforceRateLimit(req, res, 'export-canvas', 30, 60_000)) return;
+      let body;
+      try {
+        body = await readJsonBody(req, 8 * 1024 * 1024);
+      } catch (err) {
+        return sendJson(req, res, config, err.statusCode || 400, { error: err.message });
+      }
+      const originBase = resolveOrigin(req, config);
+      const outHtml = buildComposedCanvasHtml(body, 'export', originBase);
+      db.logExport(license.licenseKey, 'canvas:html');
+      res.writeHead(
+        200,
+        applySecurityHeaders(req, res, config, {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="framevault-website-canvas.html"',
+          'Content-Length': Buffer.byteLength(outHtml, 'utf8'),
+          'Cache-Control': 'no-store'
+        })
+      );
+      return res.end(outHtml);
+    }
+
     // 11B. Licensed Editable Figma Bundle (POST /api/figma — returns editable SVG + Design Tokens JSON)
     if (safeUrl === '/api/figma' && req.method === 'POST') {
       const license = verifyLicenseFromRequest(req, db);
@@ -1715,6 +1926,7 @@ function createAppServer(configOverrides = {}, deps = {}) {
   function shutdown() {
     rateLimiter.destroy();
     previewStore.clear();
+    canvasPreviewStore.clear();
     db.close();
   }
 

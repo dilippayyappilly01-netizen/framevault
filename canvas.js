@@ -1757,33 +1757,90 @@ ${nodesHtml}
 </html>`;
   }
 
-  function openLivePreviewTab() {
+  function buildCanvasServerPayload(includeCustomParams = false) {
+    return {
+      pageBg: state.pageBg,
+      pageWidth: getArtboardWidth(),
+      pageHeight: state.pageHeight,
+      layers: state.layers.map(l => {
+        if (includeCustomParams && l.kind === 'component') {
+          const comp = getComponentById(l.compId);
+          if (comp && comp.controlParameterSet && window.FrameVaultApp?.isCustomized?.(comp.id)) {
+            return { ...l, controlParameterSet: comp.controlParameterSet };
+          }
+        }
+        return l;
+      })
+    };
+  }
+
+  async function openLivePreviewTab() {
     if (state.layers.length === 0) {
       toast('Add at least one component to preview');
       return;
     }
-    const html = buildComposedHtmlDocument(window.location.origin);
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank', 'noopener,noreferrer');
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    const win = window.open('about:blank', '_blank');
+    try {
+      const res = await fetch('/api/preview-canvas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildCanvasServerPayload(false))
+      });
+      if (!res.ok) throw new Error('Preview request failed');
+      const data = await res.json();
+      if (data.previewUrl) {
+        if (win) {
+          win.location.href = data.previewUrl;
+        } else {
+          window.open(data.previewUrl, '_blank', 'noopener,noreferrer');
+        }
+        return;
+      }
+      throw new Error('Missing previewUrl');
+    } catch (_) {
+      if (win) win.close();
+      toast('Could not open live preview — try again');
+    }
   }
 
-  function exportHtmlFile() {
+  async function exportHtmlFile() {
     if (state.layers.length === 0) {
       toast('Add at least one component before exporting');
       return;
     }
-    const html = buildComposedHtmlDocument(window.location.origin);
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'framevault-website-canvas.html';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-    toast('Downloaded framevault-website-canvas.html');
+    toast('Compiling standalone HTML with embedded components...');
+    try {
+      const res = await fetch('/api/export-canvas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildCanvasServerPayload(true))
+      });
+      if (res.status === 402) {
+        if (window.FrameVaultApp?.openCheckoutModal) {
+          window.FrameVaultApp.openCheckoutModal(() => exportHtmlFile());
+        } else {
+          toast('All-Access Pass required to export standalone Canvas HTML');
+        }
+        return;
+      }
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        toast(errData.error || 'Failed to export Canvas HTML');
+        return;
+      }
+      const html = await res.text();
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'framevault-website-canvas.html';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      toast('Downloaded self-contained framevault-website-canvas.html');
+    } catch (_) {
+      toast('Export failed — check your connection and try again');
+    }
   }
 
   function copyAiBuildPrompt() {

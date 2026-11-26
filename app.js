@@ -3735,6 +3735,7 @@
   // Expose lightweight bridge for canvas.js Website Builder
   window.FrameVaultApp = {
     openStudio: (compId, tab) => openStudio(compId, tab),
+    openCheckoutModal: (onUnlocked) => openCheckoutModal(onUnlocked),
     showToast: (msg) => showToast(msg),
     getComponents: () => components,
     getSections: () => sections,
