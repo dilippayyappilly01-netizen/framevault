@@ -606,6 +606,7 @@
           </div>
           <div class="ok-card-actions">
             <button class="ok-btn-primary btn-open-studio">Customize</button>
+            <button class="ok-btn-secondary btn-add-to-canvas" title="Add this component to the Website Design Canvas">+ Canvas</button>
             <button class="ok-btn-secondary btn-toggle-tune" title="Quick inline sliders">Tune</button>
             ${comp.section === 'carasols'
               ? `<button class="ok-btn-secondary btn-open-images">Images</button>`
@@ -803,6 +804,18 @@
       const studioBtn = cardEl.querySelector('.btn-open-studio');
       if (studioBtn) {
         studioBtn.addEventListener('click', () => openStudio(comp.id));
+      }
+
+      // Add to Website Canvas Button
+      const addCanvasBtn = cardEl.querySelector('.btn-add-to-canvas');
+      if (addCanvasBtn) {
+        addCanvasBtn.addEventListener('click', () => {
+          if (window.FrameVaultCanvas && typeof window.FrameVaultCanvas.addComponent === 'function') {
+            window.FrameVaultCanvas.addComponent(comp.id, { scrollToCanvas: true });
+          } else {
+            document.getElementById('canvasSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        });
       }
 
       // Quick Inline Sliders Toggle Button (prefetch params on expand)
@@ -1971,6 +1984,11 @@
     document.getElementById('studioCloseBtn')?.addEventListener('click', closeStudio);
     studioBackdrop?.addEventListener('click', (e) => {
       if (e.target === studioBackdrop) closeStudio();
+    });
+
+    // Website Design Canvas Navigation Binding
+    document.getElementById('btnNavCanvas')?.addEventListener('click', () => {
+      document.getElementById('canvasSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 
     // MCP Server + Skill UI Navigation & Modal Bindings
@@ -3713,6 +3731,17 @@
 
     await refreshMcpInfo();
   }
+
+  // Expose lightweight bridge for canvas.js Website Builder
+  window.FrameVaultApp = {
+    openStudio: (compId, tab) => openStudio(compId, tab),
+    showToast: (msg) => showToast(msg),
+    getComponents: () => components,
+    getSections: () => sections,
+    getComponentById: (id) => compMap.get(id) || null,
+    isCustomized: (id) => customizedSet.has(id),
+    getRuntimeStatePayload: (comp) => getRuntimeStatePayload(comp)
+  };
 
   // Initialize App
   renderNavigation();

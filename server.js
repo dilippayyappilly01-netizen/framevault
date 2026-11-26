@@ -42,7 +42,7 @@ const MIME_TYPES = {
   '.woff2': 'font/woff2'
 };
 
-const PUBLIC_ROOT_FILES = new Set(['/index.html', '/styles.css', '/app.js', '/favicon.svg']);
+const PUBLIC_ROOT_FILES = new Set(['/index.html', '/styles.css', '/app.js', '/canvas.js', '/favicon.svg']);
 const ALLOWED_DESIGN_ASSET_EXTS = new Set([
   '.jpg',
   '.jpeg',

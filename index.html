@@ -42,6 +42,7 @@
             <button class="ok-top-link" data-quick-sec="cubes">Cubes</button>
             <button class="ok-top-link" data-quick-sec="backgrounds">Backgrounds</button>
           </span>
+          <button class="ok-top-link" id="btnNavCanvas">Canvas <span class="ok-nav-pill-badge" id="navCanvasCountBadge">0</span></button>
           <button class="ok-top-link" id="btnNavMcp">MCP</button>
           <button class="ok-top-link" id="btnNavPricing">Pricing</button>
         </nav>
@@ -165,6 +166,143 @@
   <!-- MAIN COMPONENT GALLERY -->
   <main class="ok-container ok-main">
     <div id="mainSectionsContainer" class="ok-sections-stack"></div>
+
+    <!-- INTERACTIVE WEBSITE DESIGN CANVAS SECTION -->
+    <section class="ok-canvas-section" id="canvasSection" aria-label="Website Design Canvas">
+      <div class="ok-pricing-head ok-canvas-head">
+        <span class="ok-hero-eyebrow">Interactive Page Composer</span>
+        <h2 class="ok-pricing-title">Design your website on the live Canvas</h2>
+        <p class="ok-pricing-sub">
+          Drag, layer, and arrange live WebGL, 3D &amp; Canvas components directly from the FrameVault store directory alongside navbars, headlines, glass cards, and CTAs. Preview live or export your layout.
+        </p>
+      </div>
+
+      <div class="ok-canvas-shell" id="canvasShell">
+        <!-- Top Canvas Toolbar -->
+        <div class="ok-canvas-toolbar">
+          <div class="ok-canvas-tb-group">
+            <select id="canvasTemplateSelect" class="ok-canvas-select" title="Load a starter website template">
+              <option value="" disabled selected>Templates...</option>
+              <option value="saas-hero">AI SaaS Hero</option>
+              <option value="product-3d">3D Product Showcase</option>
+              <option value="portfolio">Minimal Portfolio</option>
+              <option value="blank">Blank Canvas</option>
+            </select>
+
+            <div class="ok-segmented" id="canvasModeTabs" title="Switch between Edit layout and Interact with live 3D components">
+              <button type="button" class="ok-seg-btn active" data-canvas-mode="edit">Edit</button>
+              <button type="button" class="ok-seg-btn" data-canvas-mode="interact">Interact</button>
+            </div>
+
+            <div class="ok-segmented" id="canvasViewportTabs" title="Artboard Viewport Width">
+              <button type="button" class="ok-seg-btn active" data-canvas-vp="desktop">Desktop</button>
+              <button type="button" class="ok-seg-btn" data-canvas-vp="tablet">Tablet</button>
+              <button type="button" class="ok-seg-btn" data-canvas-vp="mobile">Mobile</button>
+            </div>
+          </div>
+
+          <div class="ok-canvas-tb-group ok-canvas-tb-blocks">
+            <span class="ok-canvas-tb-label">UI Blocks:</span>
+            <button type="button" class="ok-canvas-mini-btn" data-add-block="navbar" title="Add Navigation Bar">+ Navbar</button>
+            <button type="button" class="ok-canvas-mini-btn" data-add-block="heading" title="Add Hero Headline">+ Heading</button>
+            <button type="button" class="ok-canvas-mini-btn" data-add-block="text" title="Add Body Text">+ Text</button>
+            <button type="button" class="ok-canvas-mini-btn" data-add-block="button" title="Add CTA Button">+ Button</button>
+            <button type="button" class="ok-canvas-mini-btn" data-add-block="card" title="Add Glass Card">+ Card</button>
+          </div>
+
+          <div class="ok-canvas-tb-group ok-canvas-tb-right">
+            <div class="ok-segmented" id="canvasZoomTabs" title="Canvas Zoom">
+              <button type="button" class="ok-seg-btn active" data-canvas-zoom="fit">Fit</button>
+              <button type="button" class="ok-seg-btn" data-canvas-zoom="0.75">75%</button>
+              <button type="button" class="ok-seg-btn" data-canvas-zoom="1">100%</button>
+            </div>
+
+            <button type="button" class="ok-canvas-icon-btn" id="btnCanvasSnap" title="Toggle 16px Grid Snap" aria-pressed="true">Snap</button>
+            <button type="button" class="ok-canvas-icon-btn" id="btnCanvasUndo" title="Undo (Ctrl+Z)" disabled>&larr;</button>
+            <button type="button" class="ok-canvas-icon-btn" id="btnCanvasRedo" title="Redo (Ctrl+Y)" disabled>&rarr;</button>
+            <button type="button" class="ok-canvas-icon-btn" id="btnCanvasFullscreen" title="Expand Canvas Fullscreen">Expand</button>
+            <button type="button" class="ok-btn-secondary ok-canvas-act-btn" id="btnCanvasPreviewTab" title="Open live interactive preview in a new tab">Preview &#8599;</button>
+            <button type="button" class="ok-btn-secondary ok-canvas-act-btn" id="btnCanvasCopyPrompt" title="Copy structured AI build prompt for MCP">AI Prompt</button>
+            <button type="button" class="ok-cta-blue ok-canvas-act-btn" id="btnCanvasExportHtml" title="Download composed website as HTML">Export HTML</button>
+          </div>
+        </div>
+
+        <!-- 3-Pane Workspace: Directory/Layers | Live Artboard | Inspector -->
+        <div class="ok-canvas-workspace">
+          <!-- Left Pane: Store Directory & Layers -->
+          <aside class="ok-canvas-sidebar" aria-label="Store Component Directory and Layers">
+            <div class="ok-canvas-pane-tabs">
+              <button type="button" class="ok-canvas-pane-tab active" data-left-tab="directory">
+                Directory <span class="ok-chip-count" id="canvasDirTotalBadge">300</span>
+              </button>
+              <button type="button" class="ok-canvas-pane-tab" data-left-tab="layers">
+                Layers <span class="ok-chip-count" id="canvasLayerCountBadge">0</span>
+              </button>
+            </div>
+
+            <!-- Directory Panel -->
+            <div class="ok-canvas-left-panel active" id="canvasDirPanel">
+              <div class="ok-canvas-dir-search-wrap">
+                <input type="text" id="canvasDirSearch" class="ok-canvas-input" placeholder="Search 300 store components...">
+              </div>
+              <div class="ok-canvas-dir-cats" id="canvasDirCats"></div>
+              <div class="ok-canvas-dir-list" id="canvasDirList"></div>
+            </div>
+
+            <!-- Layers Panel -->
+            <div class="ok-canvas-left-panel" id="canvasLayersPanel">
+              <div class="ok-canvas-layers-bar">
+                <span class="ok-canvas-muted-meta" id="canvasWebglBudget">0 / 6 WebGL active</span>
+                <div style="display:flex;gap:6px;">
+                  <button type="button" class="ok-canvas-mini-btn" id="btnCanvasSaveJson" title="Save canvas project JSON">Save</button>
+                  <button type="button" class="ok-canvas-mini-btn" id="btnCanvasLoadJson" title="Load canvas project JSON">Load</button>
+                  <input type="file" id="canvasLoadJsonInput" accept=".json,application/json" style="display:none;">
+                  <button type="button" class="ok-canvas-mini-btn ok-canvas-danger-text" id="btnCanvasClearAll" title="Clear all layers">Clear</button>
+                </div>
+              </div>
+              <div class="ok-canvas-layers-list" id="canvasLayersList"></div>
+            </div>
+          </aside>
+
+          <!-- Center Pane: Live Artboard Stage -->
+          <div class="ok-canvas-stage-viewport" id="canvasStageViewport">
+            <div class="ok-canvas-artboard-outer" id="canvasArtboardOuter">
+              <div class="ok-canvas-artboard show-grid" id="canvasArtboard">
+                <div class="ok-canvas-guides" id="canvasGuides" aria-hidden="true">
+                  <div class="ok-canvas-guide-v" id="canvasGuideV"></div>
+                  <div class="ok-canvas-guide-h" id="canvasGuideH"></div>
+                </div>
+                <div class="ok-canvas-empty-hint" id="canvasEmptyHint">
+                  <div class="ok-canvas-empty-card">
+                    <span class="ok-pill-pro">Website Canvas</span>
+                    <h3>Drag components from the store directory</h3>
+                    <p>Click <strong>+ Add</strong> or drag any Orb, Asset, Carousel, Cube, or Background onto this artboard, or load a starter template to begin.</p>
+                    <div class="ok-canvas-empty-actions">
+                      <button type="button" class="ok-cta-blue" id="btnCanvasLoadStarterHero">Load AI SaaS Hero Template</button>
+                      <button type="button" class="ok-btn-secondary" id="btnCanvasLoadStarter3d">Load 3D Product Showcase</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="ok-canvas-layers-host" id="canvasLayersHost"></div>
+              </div>
+              <div class="ok-canvas-artboard-footer">
+                <span id="canvasArtboardDimsLabel">1280 &times; 1200 px</span>
+                <button type="button" class="ok-canvas-mini-btn" id="btnCanvasExtendHeight">+ Add 400px Height</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Pane: Properties Inspector -->
+          <aside class="ok-canvas-inspector" aria-label="Layer Properties Inspector">
+            <div class="ok-canvas-inspector-head">
+              <span class="ok-canvas-inspector-title" id="canvasInspectorTitle">Page Settings</span>
+              <span class="ok-canvas-inspector-badge" id="canvasInspectorBadge">Canvas</span>
+            </div>
+            <div class="ok-canvas-inspector-scroll" id="canvasInspectorBody"></div>
+          </aside>
+        </div>
+      </div>
+    </section>
 
     <!-- MCP SERVER + AGENT SKILL DELIVERY LAYER SECTION -->
     <section class="ok-mcp-section" id="mcpSection" aria-label="MCP Server and Agent Skill">
@@ -624,5 +762,6 @@
 
   <script src="components-data.js" defer></script>
   <script src="app.js" defer></script>
+  <script src="canvas.js" defer></script>
 </body>
 </html>
