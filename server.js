@@ -1255,12 +1255,14 @@ function createAppServer(configOverrides = {}, deps = {}) {
       });
     }
 
-    // 13. Universal Remote Streamable HTTP MCP Endpoint (/api/mcp — Codex, Cursor, Claude, Antigravity)
-    if (safeUrl === '/api/mcp') {
+    // 13. Universal Remote Streamable HTTP MCP Endpoint (/api/mcp — Lovable, Codex, Cursor, Claude, Antigravity)
+    if (safeUrl === '/api/mcp' || safeUrl === '/api/mcp/') {
+      const incomingSessionId = String(req.headers['mcp-session-id'] || '').trim();
       const mcpCorsHeaders = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, GET, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Authorization, Content-Type, Accept, Mcp-Session-Id, Mcp-Protocol-Version',
+        'Access-Control-Allow-Headers': 'Authorization, X-API-Key, Content-Type, Accept, Mcp-Session-Id, Mcp-Protocol-Version',
+        'Access-Control-Expose-Headers': 'Mcp-Session-Id, Mcp-Protocol-Version',
         'Cache-Control': 'no-store'
       };
 
@@ -1271,6 +1273,7 @@ function createAppServer(configOverrides = {}, deps = {}) {
 
       // Per MCP Streamable HTTP spec: stateless servers without SSE server-push return 405 on GET
       if (req.method === 'GET') {
+        console.log(`[mcp] GET ${safeUrl} -> 405`);
         res.writeHead(405, applySecurityHeaders(req, res, config, {
           ...mcpCorsHeaders,
           Allow: 'POST, DELETE, OPTIONS'
@@ -1280,6 +1283,7 @@ function createAppServer(configOverrides = {}, deps = {}) {
 
       // Clean session close for clients that send DELETE on shutdown
       if (req.method === 'DELETE') {
+        console.log(`[mcp] DELETE ${safeUrl} -> 204`);
         res.writeHead(204, applySecurityHeaders(req, res, config, mcpCorsHeaders));
         return res.end();
       }
@@ -1296,14 +1300,25 @@ function createAppServer(configOverrides = {}, deps = {}) {
 
       let license = verifyLicenseFromRequest(req, db);
       if (!license) {
+        // Support Bearer <key>, double-prefixed Bearer Bearer <key>, raw Authorization <key>, X-API-Key, or ?token=
+        const candidates = [];
         const authHeader = String(req.headers.authorization || '').trim();
-        const bearerMatch = authHeader.match(/^Bearer\s+(.+)$/i);
-        if (bearerMatch) {
-          const rawKey = bearerMatch[1].trim();
+        if (authHeader) {
+          const stripped = authHeader.replace(/^(?:Bearer\s+)+/i, '').trim();
+          if (stripped) candidates.push(stripped);
+        }
+        const apiKeyHeader = String(req.headers['x-api-key'] || '').trim();
+        if (apiKeyHeader) candidates.push(apiKeyHeader);
+        const queryToken = String(fullUrl.searchParams.get('token') || fullUrl.searchParams.get('api_key') || '').trim();
+        if (queryToken) candidates.push(queryToken);
+
+        for (const rawKey of candidates) {
           license = db.findActiveLicenseByKey(rawKey) || db.findActiveLicenseByKey(rawKey.toUpperCase());
+          if (license) break;
         }
       }
       if (!license) {
+        console.log(`[mcp] POST ${safeUrl} -> 401 (unauthenticated)`);
         return sendJson(req, res, config, 401, {
           jsonrpc: '2.0',
           id: null,
@@ -1325,26 +1340,37 @@ function createAppServer(configOverrides = {}, deps = {}) {
         }, mcpCorsHeaders);
       }
 
+      const responseHeaders = { ...mcpCorsHeaders };
+      const sessionId = incomingSessionId || crypto.randomUUID();
+
       // Support JSON-RPC 2.0 batch requests as well as single messages
       if (Array.isArray(body)) {
         const responses = [];
         for (const item of body) {
+          if (item && item.method === 'initialize') {
+            responseHeaders['Mcp-Session-Id'] = sessionId;
+          }
           const resItem = handleMcpJsonRpc(item, { catalog, rootDir });
           if (resItem.payload !== null) responses.push(resItem.payload);
         }
+        console.log(`[mcp] POST ${safeUrl} batch(${body.length}) -> ${responses.length ? 200 : 202}`);
         if (responses.length === 0) {
-          res.writeHead(202, applySecurityHeaders(req, res, config, mcpCorsHeaders));
+          res.writeHead(202, applySecurityHeaders(req, res, config, responseHeaders));
           return res.end();
         }
-        return sendJson(req, res, config, 200, responses, mcpCorsHeaders);
+        return sendJson(req, res, config, 200, responses, responseHeaders);
       }
 
+      if (body && body.method === 'initialize') {
+        responseHeaders['Mcp-Session-Id'] = sessionId;
+      }
       const result = handleMcpJsonRpc(body, { catalog, rootDir });
+      console.log(`[mcp] POST ${safeUrl} method=${body?.method || 'unknown'} -> ${result.status}`);
       if (result.status === 202 || result.payload === null) {
-        res.writeHead(202, applySecurityHeaders(req, res, config, mcpCorsHeaders));
+        res.writeHead(202, applySecurityHeaders(req, res, config, responseHeaders));
         return res.end();
       }
-      return sendJson(req, res, config, result.status, result.payload, mcpCorsHeaders);
+      return sendJson(req, res, config, result.status, result.payload, responseHeaders);
     }
 
     // 14. Official FrameVault Figma Plugin API (/api/figma-plugin/* — CORS enabled for Figma plugin iframe)
