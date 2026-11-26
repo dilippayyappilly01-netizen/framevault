@@ -141,21 +141,51 @@ function handleMcpJsonRpc(rpc, { catalog }) {
   }
 
   if (method === 'initialize') {
+    const requestedVersion = String(params.protocolVersion || '').trim();
+    const supportedVersions = new Set(['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05']);
+    const negotiatedVersion = supportedVersions.has(requestedVersion) ? requestedVersion : '2025-03-26';
     return {
       status: 200,
       payload: {
         jsonrpc: '2.0',
         id,
         result: {
-          protocolVersion: '2025-03-26',
+          protocolVersion: negotiatedVersion,
           capabilities: {
             tools: { listChanged: false },
-            resources: { listChanged: false }
+            resources: { listChanged: false },
+            prompts: { listChanged: false }
           },
           serverInfo: {
             name: 'framevault-ui-mcp',
             version: '1.0.0'
           }
+        }
+      }
+    };
+  }
+
+  if (method === 'prompts/list') {
+    return {
+      status: 200,
+      payload: {
+        jsonrpc: '2.0',
+        id,
+        result: {
+          prompts: []
+        }
+      }
+    };
+  }
+
+  if (method === 'resources/templates/list') {
+    return {
+      status: 200,
+      payload: {
+        jsonrpc: '2.0',
+        id,
+        result: {
+          resourceTemplates: []
         }
       }
     };

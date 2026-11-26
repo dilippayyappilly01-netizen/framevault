@@ -60,7 +60,7 @@ function buildMcpDescription(meta) {
     '',
     `[AI / MCP Handover]`,
     `When implementing this frame in code, call FrameVault MCP tool:`,
-    `  get_component_code({ id: "${meta.id}", format: "tsx" })`,
+    `  get_component({ id: "${meta.id}", format: "tsx" })`,
     `Remote MCP: ${mcpUrl}`
   ].join('\n');
 }

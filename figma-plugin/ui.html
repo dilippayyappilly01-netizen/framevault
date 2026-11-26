@@ -780,7 +780,7 @@
 
   els.copyPromptBtn.addEventListener('click', () => {
     if (!state.selectedComp) return;
-    const prompt = `Use FrameVault MCP to fetch component "${state.selectedComp.id}" (${state.selectedComp.title || state.selectedComp.name}) via get_component_code({ id: "${state.selectedComp.id}", format: "tsx" }) and integrate it into my React/Next.js page matching the Figma layout.`;
+    const prompt = `Use the originkit-ui MCP server: read ui://guidelines/design-system, call get_component({ id: "${state.selectedComp.id}", format: "tsx" }) to fetch "${state.selectedComp.title || state.selectedComp.name}", and integrate it into my React/Next.js page matching the Figma layout.`;
     copyTextFallback(prompt);
     postToPlugin({ type: 'notify', message: 'Copied AI + MCP handover prompt!' });
   });

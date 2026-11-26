@@ -1066,7 +1066,28 @@ test('OWNER_LICENSE_KEY unlocks all paid features in production without exposing
     assert.equal(srcRes.status, 200);
     assert.ok(srcRes.json.code.includes('Background 151'));
 
-    // Remote MCP Bearer auth also accepts owner key
+    // Remote MCP Bearer auth also accepts owner key & Codex Streamable HTTP methods
+    const getRes = await request(srv.baseUrl, '/api/mcp', { method: 'GET' });
+    assert.equal(getRes.status, 405);
+    const delRes = await request(srv.baseUrl, '/api/mcp', { method: 'DELETE' });
+    assert.equal(delRes.status, 204);
+
+    const initRes = await request(srv.baseUrl, '/api/mcp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secretOwnerKey}` },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 0, method: 'initialize', params: { protocolVersion: '2025-06-18' } })
+    });
+    assert.equal(initRes.status, 200);
+    assert.equal(initRes.json.result?.protocolVersion, '2025-06-18');
+
+    const promptsRes = await request(srv.baseUrl, '/api/mcp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secretOwnerKey}` },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'prompts/list', params: {} })
+    });
+    assert.equal(promptsRes.status, 200);
+    assert.ok(Array.isArray(promptsRes.json.result?.prompts));
+
     const mcpRes = await request(srv.baseUrl, '/api/mcp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secretOwnerKey}` },

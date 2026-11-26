@@ -1147,6 +1147,11 @@ function createAppServer(configOverrides = {}, deps = {}) {
                 label: 'Cursor',
                 fileHint: '.cursor/mcp.json',
                 json: JSON.stringify(baseConfig, null, 2)
+              },
+              codex: {
+                label: 'Codex (TOML)',
+                fileHint: '~/.codex/config.toml',
+                json: `[mcp_servers.originkit-ui]\ncommand = "node"\nargs = ["${mcpEntry.replace(/\\/g, '/')}"]\n\n[mcp_servers.originkit-ui.env]\nORIGINKIT_DESIGNS_DIR = "${designsDir.replace(/\\/g, '/')}"`
               }
             }
           })),
@@ -1157,7 +1162,8 @@ function createAppServer(configOverrides = {}, deps = {}) {
             configs: {
               antigravity: { label: 'Antigravity', fileHint: 'mcp_config.json', json: lockedStub },
               claude: { label: 'Claude Desktop / Code', fileHint: 'claude_desktop_config.json or .mcp.json', json: lockedStub },
-              cursor: { label: 'Cursor', fileHint: '.cursor/mcp.json', json: lockedStub }
+              cursor: { label: 'Cursor', fileHint: '.cursor/mcp.json', json: lockedStub },
+              codex: { label: 'Codex (TOML)', fileHint: '~/.codex/config.toml', json: lockedStub }
             }
           }))
         };
@@ -1181,6 +1187,13 @@ function createAppServer(configOverrides = {}, deps = {}) {
               }
             }
           };
+          const codexToml = [
+            `[mcp_servers.originkit-ui]`,
+            `url = "${remoteMcpUrl}"`,
+            ``,
+            `[mcp_servers.originkit-ui.http_headers]`,
+            `Authorization = "Bearer ${license.isOwner ? '<YOUR_OWNER_OR_LICENSE_KEY>' : license.licenseKey}"`
+          ].join('\n');
           const parsedUnlocked = JSON.parse(mcpInfoCache.unlocked.raw.toString('utf8'));
           const remotePayload = {
             ...parsedUnlocked,
@@ -1201,6 +1214,11 @@ function createAppServer(configOverrides = {}, deps = {}) {
                 label: 'Cursor',
                 fileHint: '.cursor/mcp.json',
                 json: JSON.stringify(remoteConfig, null, 2)
+              },
+              codex: {
+                label: 'Codex (TOML)',
+                fileHint: '~/.codex/config.toml',
+                json: codexToml
               }
             }
           };
@@ -1215,8 +1233,43 @@ function createAppServer(configOverrides = {}, deps = {}) {
       });
     }
 
-    // 13. Universal Remote Streamable HTTP MCP Endpoint (POST /api/mcp — Bearer license key or signed cookie)
-    if (safeUrl === '/api/mcp' && req.method === 'POST') {
+    // 13. Universal Remote Streamable HTTP MCP Endpoint (/api/mcp — Codex, Cursor, Claude, Antigravity)
+    if (safeUrl === '/api/mcp') {
+      const mcpCorsHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, GET, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type, Accept, Mcp-Session-Id, Mcp-Protocol-Version',
+        'Cache-Control': 'no-store'
+      };
+
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204, applySecurityHeaders(req, res, config, mcpCorsHeaders));
+        return res.end();
+      }
+
+      // Per MCP Streamable HTTP spec: stateless servers without SSE server-push return 405 on GET
+      if (req.method === 'GET') {
+        res.writeHead(405, applySecurityHeaders(req, res, config, {
+          ...mcpCorsHeaders,
+          Allow: 'POST, DELETE, OPTIONS'
+        }));
+        return res.end();
+      }
+
+      // Clean session close for clients that send DELETE on shutdown
+      if (req.method === 'DELETE') {
+        res.writeHead(204, applySecurityHeaders(req, res, config, mcpCorsHeaders));
+        return res.end();
+      }
+
+      if (req.method !== 'POST') {
+        res.writeHead(405, applySecurityHeaders(req, res, config, {
+          ...mcpCorsHeaders,
+          Allow: 'POST, DELETE, OPTIONS'
+        }));
+        return res.end();
+      }
+
       if (!enforceRateLimit(req, res, 'remote-mcp', 120, 60_000)) return;
 
       let license = verifyLicenseFromRequest(req, db);
@@ -1224,8 +1277,8 @@ function createAppServer(configOverrides = {}, deps = {}) {
         const authHeader = String(req.headers.authorization || '').trim();
         const bearerMatch = authHeader.match(/^Bearer\s+(.+)$/i);
         if (bearerMatch) {
-          const key = bearerMatch[1].trim().toUpperCase();
-          license = db.findActiveLicenseByKey(key);
+          const rawKey = bearerMatch[1].trim();
+          license = db.findActiveLicenseByKey(rawKey) || db.findActiveLicenseByKey(rawKey.toUpperCase());
         }
       }
       if (!license) {
@@ -1236,7 +1289,7 @@ function createAppServer(configOverrides = {}, deps = {}) {
             code: -32001,
             message: `Unauthorized — valid FrameVault All-Access license key (${config.licensePriceDisplay}) required in Authorization: Bearer <LICENSE_KEY>.`
           }
-        });
+        }, mcpCorsHeaders);
       }
 
       let body;
@@ -1247,15 +1300,29 @@ function createAppServer(configOverrides = {}, deps = {}) {
           jsonrpc: '2.0',
           id: null,
           error: { code: -32700, message: err.message || 'Parse error' }
-        });
+        }, mcpCorsHeaders);
+      }
+
+      // Support JSON-RPC 2.0 batch requests as well as single messages
+      if (Array.isArray(body)) {
+        const responses = [];
+        for (const item of body) {
+          const resItem = handleMcpJsonRpc(item, { catalog, rootDir });
+          if (resItem.payload !== null) responses.push(resItem.payload);
+        }
+        if (responses.length === 0) {
+          res.writeHead(202, applySecurityHeaders(req, res, config, mcpCorsHeaders));
+          return res.end();
+        }
+        return sendJson(req, res, config, 200, responses, mcpCorsHeaders);
       }
 
       const result = handleMcpJsonRpc(body, { catalog, rootDir });
       if (result.status === 202 || result.payload === null) {
-        res.writeHead(202, applySecurityHeaders(req, res, config, { 'Cache-Control': 'no-store' }));
+        res.writeHead(202, applySecurityHeaders(req, res, config, mcpCorsHeaders));
         return res.end();
       }
-      return sendJson(req, res, config, result.status, result.payload, { 'Cache-Control': 'no-store' });
+      return sendJson(req, res, config, result.status, result.payload, mcpCorsHeaders);
     }
 
     // 14. Official FrameVault Figma Plugin API (/api/figma-plugin/* — CORS enabled for Figma plugin iframe)
