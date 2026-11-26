@@ -1057,7 +1057,7 @@ test('OWNER_LICENSE_KEY unlocks all paid features in production without exposing
     assert.equal(statusRes.json.unlocked, true);
     assert.equal(statusRes.json.licenseKey, 'OWNER-ACCESS');
 
-    // Paid /api/source endpoint succeeds with owner cookie
+    // Paid /api/source endpoint succeeds with owner cookie (HTML & Framer Code Component)
     const srcRes = await request(srv.baseUrl, '/api/source', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Cookie: cookie },
@@ -1065,6 +1065,18 @@ test('OWNER_LICENSE_KEY unlocks all paid features in production without exposing
     });
     assert.equal(srcRes.status, 200);
     assert.ok(srcRes.json.code.includes('Background 151'));
+
+    const framerRes = await request(srv.baseUrl, '/api/source', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Cookie: cookie },
+      body: JSON.stringify({ id: 'orbs__orb-1', format: 'framer' })
+    });
+    assert.equal(framerRes.status, 200);
+    assert.equal(framerRes.json.format, 'framer');
+    assert.ok(framerRes.json.filename.endsWith('.framer.tsx'));
+    assert.ok(framerRes.json.code.includes("from 'framer'"));
+    assert.ok(framerRes.json.code.includes('@framerSupportedLayoutWidth'));
+    assert.ok(framerRes.json.code.includes('addPropertyControls('));
 
     // Remote MCP Bearer auth also accepts owner key & Codex Streamable HTTP methods
     const getRes = await request(srv.baseUrl, '/api/mcp', { method: 'GET' });

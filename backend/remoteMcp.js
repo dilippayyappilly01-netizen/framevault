@@ -1,4 +1,4 @@
-const { convertHtmlToReactTsx } = require('./reactConverter');
+const { convertHtmlToReactTsx, convertHtmlToFramerTsx } = require('./reactConverter');
 
 function slugify(str) {
   return String(str || '')
@@ -223,7 +223,7 @@ function handleMcpJsonRpc(rpc, { catalog }) {
                 type: 'object',
                 properties: {
                   id: { type: 'string', description: 'Component id (e.g. "orbs/orb-1", "assets/asset-2")' },
-                  format: { type: 'string', enum: ['html', 'tsx'], description: 'Output format: "html" (default) or "tsx" (TypeScript + React)' },
+                  format: { type: 'string', enum: ['html', 'tsx', 'framer'], description: 'Output format: "html" (default), "tsx" (TypeScript + React), or "framer" (Framer Code Component)' },
                   targetFramework: { type: 'string', description: 'Optional target framework for Remix guidance' }
                 },
                 required: ['id']
@@ -283,20 +283,20 @@ function handleMcpJsonRpc(rpc, { catalog }) {
         };
       }
 
-      const format = String(args.format || 'html').toLowerCase() === 'tsx' ? 'tsx' : 'html';
+      const rawFmt = String(args.format || 'html').toLowerCase();
+      const format = rawFmt === 'framer' ? 'framer' : rawFmt === 'tsx' ? 'tsx' : 'html';
       const mcpId = getMcpId(comp);
-      const fw = String(args.targetFramework || (format === 'tsx' ? 'React + TypeScript' : 'Standalone HTML'));
+      const fw = String(args.targetFramework || (format === 'framer' ? 'Framer Code Component' : format === 'tsx' ? 'React + TypeScript' : 'Standalone HTML'));
       let code = comp.htmlSource || '';
       let outFilename = comp.htmlPath || `${mcpId}.html`;
-      if (format === 'tsx') {
-        const reactOut = convertHtmlToReactTsx(code, {
-          section: comp.section,
-          name: comp.name,
-          id: comp.id
-        });
+      if (format === 'tsx' || format === 'framer') {
+        const reactOut = format === 'framer'
+          ? convertHtmlToFramerTsx(code, { section: comp.section, name: comp.name, id: comp.id })
+          : convertHtmlToReactTsx(code, { section: comp.section, name: comp.name, id: comp.id });
         code = reactOut.tsx;
         outFilename = reactOut.filename;
       }
+      const fenceLang = format === 'html' ? 'html' : 'tsx';
 
       const text = [
         `# Component: ${comp.displayTitle} (\`${mcpId}\`)`,
@@ -308,7 +308,7 @@ function handleMcpJsonRpc(rpc, { catalog }) {
         `- Preserve all ${comp.engine} shaders, physics, and \`requestAnimationFrame\` cleanup hooks.`,
         '',
         `## Source Code (\`${outFilename}\`)`,
-        `\`\`\`${format}`,
+        `\`\`\`${fenceLang}`,
         code,
         '```'
       ].join('\n');

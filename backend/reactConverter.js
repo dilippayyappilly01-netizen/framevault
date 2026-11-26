@@ -836,6 +836,81 @@ export default ${componentName};
   };
 }
 
+function convertHtmlToFramerTsx(html, meta = {}) {
+  const base = convertHtmlToReactTsx(html, meta);
+  const name = base.componentName;
+  const hasImages = base.tsx.includes('imageBasePath?: string;');
+
+  // Inject Framer import right after React import
+  let framerTsx = base.tsx.replace(
+    `import React, { useEffect, useRef } from 'react';`,
+    `import React, { useEffect, useRef } from 'react';\nimport { addPropertyControls, ControlType } from 'framer';`
+  );
+
+  // Add Framer usage header
+  framerTsx = framerTsx.replace(
+    ' * Converted from FrameVault HTML component to TypeScript + React (.tsx)',
+    ' * FrameVault Framer Code Component (.tsx)\n * In Framer: Assets -> Code -> Create Code File -> Paste -> Drag onto Canvas'
+  );
+
+  // Add borderRadius prop to Props interface
+  framerTsx = framerTsx.replace(
+    '  height?: number | string;',
+    '  height?: number | string;\n  /** Corner radius in pixels (controlled from Framer sidebar) */\n  borderRadius?: number;'
+  );
+
+  // Add Framer layout sizing JSDoc annotations right above export function
+  const framerAnnotations = [
+    '/**',
+    ' * @framerSupportedLayoutWidth any-prefer-fixed',
+    ' * @framerSupportedLayoutHeight any-prefer-fixed',
+    ' * @framerIntrinsicWidth 800',
+    ' * @framerIntrinsicHeight 600',
+    ' */',
+    `export function ${name}(`
+  ].join('\n');
+  framerTsx = framerTsx.replace(`export function ${name}(`, framerAnnotations);
+
+  // Wire borderRadius into destructured props and root div style
+  framerTsx = framerTsx.replace(
+    `height = '100%'`,
+    `height = '100%', borderRadius = 0`
+  );
+  framerTsx = framerTsx.replace(
+    `style={{ width, height, ...style }}`,
+    `style={{ width, height, borderRadius, overflow: 'hidden', ...style }}`
+  );
+
+  // Append defaultProps and addPropertyControls before export default
+  const controlsBlock = [
+    `${name}.defaultProps = {`,
+    `  borderRadius: 0,${hasImages ? `\n  imageBasePath: 'images',` : ''}`,
+    `};`,
+    '',
+    `addPropertyControls(${name}, {`,
+    `  borderRadius: {`,
+    `    type: ControlType.Number,`,
+    `    title: 'Radius',`,
+    `    min: 0,`,
+    `    max: 64,`,
+    `    step: 1,`,
+    `    unit: 'px',`,
+    `    defaultValue: 0,`,
+    `  },${hasImages ? `\n  imageBasePath: {\n    type: ControlType.String,\n    title: 'Images URL',\n    defaultValue: 'images',\n  },` : ''}`,
+    `});`,
+    '',
+    `export default ${name};`
+  ].join('\n');
+
+  framerTsx = framerTsx.replace(`export default ${name};`, controlsBlock);
+
+  return {
+    componentName: name,
+    filename: `${name}.framer.tsx`,
+    tsx: framerTsx
+  };
+}
+
 function getTsxFilenameForHtml(htmlFilePath, fallbackName) {
   const dirName = path.basename(path.dirname(htmlFilePath));
   const baseName = path.basename(htmlFilePath, path.extname(htmlFilePath));
@@ -845,6 +920,7 @@ function getTsxFilenameForHtml(htmlFilePath, fallbackName) {
 
 module.exports = {
   convertHtmlToReactTsx,
+  convertHtmlToFramerTsx,
   toPascalCase,
   slugify,
   getTsxFilenameForHtml

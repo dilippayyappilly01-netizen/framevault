@@ -22,7 +22,7 @@ const {
 const razorpayDefault = require('./backend/razorpay');
 const { sendLicenseReceiptEmail } = require('./backend/email');
 const { loadCatalog, compileComponentHtml, makeCompressedAsset } = require('./backend/compiler');
-const { convertHtmlToReactTsx } = require('./backend/reactConverter');
+const { convertHtmlToReactTsx, convertHtmlToFramerTsx } = require('./backend/reactConverter');
 const { buildFigmaBundle } = require('./backend/figmaExporter');
 const { handleMcpJsonRpc } = require('./backend/remoteMcp');
 
@@ -863,21 +863,20 @@ function createAppServer(configOverrides = {}, deps = {}) {
         return sendJson(req, res, config, 404, { error: 'Component not found' });
       }
 
-      const format = String(body.format || 'html').trim().toLowerCase() === 'tsx' ? 'tsx' : 'html';
+      const rawFmt = String(body.format || 'html').trim().toLowerCase();
+      const format = rawFmt === 'framer' ? 'framer' : rawFmt === 'tsx' ? 'tsx' : 'html';
       const html = compileComponentHtml(comp, body.controlParameterSet || null, { forIframe: false });
-      if (format === 'tsx') {
-        const reactOut = convertHtmlToReactTsx(html, {
-          section: comp.section,
-          name: comp.name,
-          id: comp.id
-        });
+      if (format === 'tsx' || format === 'framer') {
+        const reactOut = format === 'framer'
+          ? convertHtmlToFramerTsx(html, { section: comp.section, name: comp.name, id: comp.id })
+          : convertHtmlToReactTsx(html, { section: comp.section, name: comp.name, id: comp.id });
         return sendJson(
           req,
           res,
           config,
           200,
           {
-            format: 'tsx',
+            format,
             code: reactOut.tsx,
             tsx: reactOut.tsx,
             html,
@@ -910,7 +909,8 @@ function createAppServer(configOverrides = {}, deps = {}) {
         return sendJson(req, res, config, err.statusCode || 400, { error: err.message });
       }
 
-      const format = String(body.format || 'html').trim().toLowerCase() === 'tsx' ? 'tsx' : 'html';
+      const rawFmt = String(body.format || 'html').trim().toLowerCase();
+      const format = rawFmt === 'framer' ? 'framer' : rawFmt === 'tsx' ? 'tsx' : 'html';
       let html = '';
       let compMeta = null;
       let componentId = 'custom';
@@ -939,12 +939,10 @@ function createAppServer(configOverrides = {}, deps = {}) {
       let contentType = 'text/html; charset=utf-8';
       let safeFilename;
 
-      if (format === 'tsx') {
-        const reactOut = convertHtmlToReactTsx(html, {
-          section: compMeta?.section,
-          name: compMeta?.name,
-          id: compMeta?.id
-        });
+      if (format === 'tsx' || format === 'framer') {
+        const reactOut = format === 'framer'
+          ? convertHtmlToFramerTsx(html, { section: compMeta?.section, name: compMeta?.name, id: compMeta?.id })
+          : convertHtmlToReactTsx(html, { section: compMeta?.section, name: compMeta?.name, id: compMeta?.id });
         outContent = reactOut.tsx;
         contentType = 'text/plain; charset=utf-8';
         const rawTsx = path

@@ -617,6 +617,9 @@
             <button class="ok-btn-secondary btn-download-tsx ${accessState.unlocked ? '' : 'ok-btn-locked'}" title="${accessState.unlocked ? 'Download React TypeScript .tsx' : `Locked — Pay ${escapeHtml(accessState.price || '$4.99')} to download React TypeScript .tsx`}">
               ${accessState.unlocked ? 'TSX' : `${LOCK_ICON_SVG}<span>TSX</span>`}
             </button>
+            <button class="ok-btn-secondary btn-copy-framer ${accessState.unlocked ? '' : 'ok-btn-locked'}" title="${accessState.unlocked ? 'Copy Framer Code Component (.tsx)' : `Locked — Pay ${escapeHtml(accessState.price || '$4.99')} to copy Framer Code Component`}">
+              ${accessState.unlocked ? 'Framer' : `${LOCK_ICON_SVG}<span>Framer</span>`}
+            </button>
             <button class="ok-btn-secondary btn-open-figma ${accessState.unlocked ? '' : 'ok-btn-locked'}" title="${accessState.unlocked ? 'Edit in Figma (copy editable SVG or design tokens)' : `Locked — Pay ${escapeHtml(accessState.price || '$4.99')} to edit in Figma`}">
               ${accessState.unlocked ? 'Figma' : `${LOCK_ICON_SVG}<span>Figma</span>`}
             </button>
@@ -827,6 +830,10 @@
       if (downloadTsxBtn) {
         downloadTsxBtn.addEventListener('click', () => exportComponentHtml(comp, 'tsx'));
       }
+      const framerBtn = cardEl.querySelector('.btn-copy-framer');
+      if (framerBtn) {
+        framerBtn.addEventListener('click', () => copyComponentHtml(comp, 'framer'));
+      }
       const figmaBtn = cardEl.querySelector('.btn-open-figma');
       if (figmaBtn) {
         figmaBtn.addEventListener('click', () => openFigmaModal(comp));
@@ -995,18 +1002,21 @@
 
   function updateStudioCodeView(comp, immediate = false) {
     if (!studioCodePre) return;
+    const isFramer = studioCodeFormat === 'framer';
     const isTsx = studioCodeFormat === 'tsx';
     const headerTitle = document.getElementById('studioCodeHeaderTitle');
     if (headerTitle) {
-      headerTitle.textContent = isTsx
-        ? 'Generated TypeScript + React (.tsx) Component'
-        : 'Generated Standalone HTML Output';
+      headerTitle.textContent = isFramer
+        ? 'Generated Framer Code Component (.framer.tsx)'
+        : isTsx
+          ? 'Generated TypeScript + React (.tsx) Component'
+          : 'Generated Standalone HTML Output';
     }
     const lockOverlay = document.getElementById('studioCodeLockOverlay');
     if (!accessState.unlocked) {
       if (lockOverlay) lockOverlay.classList.remove('hidden');
-      studioCodePre.textContent = isTsx
-        ? `// All-Access Pass (${accessState.price || '$4.99'}) required to view & download React TypeScript (.tsx) source`
+      studioCodePre.textContent = (isTsx || isFramer)
+        ? `// All-Access Pass (${accessState.price || '$4.99'}) required to view & download ${isFramer ? 'Framer Code Component' : 'React TypeScript (.tsx)'} source`
         : `<!-- All-Access Pass (${accessState.price || '$4.99'}) required to view & download HTML source -->`;
       return;
     }
@@ -1855,10 +1865,11 @@
       });
     });
 
-    // Studio Output Code Format (HTML vs React TSX)
+    // Studio Output Code Format (HTML vs React TSX vs Framer)
     document.querySelectorAll('[data-code-format]').forEach(btn => {
       btn.addEventListener('click', () => {
-        studioCodeFormat = btn.getAttribute('data-code-format') === 'tsx' ? 'tsx' : 'html';
+        const raw = btn.getAttribute('data-code-format');
+        studioCodeFormat = raw === 'framer' ? 'framer' : raw === 'tsx' ? 'tsx' : 'html';
         document.querySelectorAll('[data-code-format]').forEach(b => {
           b.classList.toggle('active', b.getAttribute('data-code-format') === studioCodeFormat);
         });
@@ -1915,6 +1926,13 @@
       updateGridCardVisuals(comp);
       renderNavigation();
       showToast(`RESET ${comp.name.toUpperCase()} TO DEFAULTS`);
+    });
+
+    // Studio Copy for Framer (gated behind All-Access license)
+    document.getElementById('studioFramerBtn')?.addEventListener('click', () => {
+      const comp = compMap.get(studioCompId);
+      if (!comp) return;
+      copyComponentHtml(comp, 'framer');
     });
 
     // Studio Edit in Figma (gated behind All-Access license)
@@ -2196,23 +2214,33 @@
       bannerEl.classList.toggle('hidden', unlocked);
     }
 
+    const isFramerFormat = studioCodeFormat === 'framer';
     const isTsxFormat = studioCodeFormat === 'tsx';
     const studioDlBtn = document.getElementById('studioDownloadBtn');
     setLockedButtonLabel(
       studioDlBtn,
-      isTsxFormat ? 'Download .tsx' : 'Download .html',
+      isFramerFormat ? 'Download .framer.tsx' : isTsxFormat ? 'Download .tsx' : 'Download .html',
       unlocked,
-      isTsxFormat ? 'Download TypeScript + React (.tsx)' : 'Download standalone .html',
-      `Locked — Pay ${priceLabel} to download ${isTsxFormat ? 'React .tsx' : 'standalone .html'}`
+      isFramerFormat ? 'Download Framer Code Component (.framer.tsx)' : isTsxFormat ? 'Download TypeScript + React (.tsx)' : 'Download standalone .html',
+      `Locked — Pay ${priceLabel} to download ${isFramerFormat ? 'Framer Code Component' : isTsxFormat ? 'React .tsx' : 'standalone .html'}`
     );
 
     const studioCopyBtn = document.getElementById('studioCopyBtn');
     setLockedButtonLabel(
       studioCopyBtn,
-      isTsxFormat ? 'Copy TSX' : 'Copy HTML',
+      isFramerFormat ? 'Copy Framer' : isTsxFormat ? 'Copy TSX' : 'Copy HTML',
       unlocked,
-      isTsxFormat ? 'Copy customized React TypeScript (.tsx)' : 'Copy customized HTML',
-      `Locked — Pay ${priceLabel} to copy ${isTsxFormat ? 'React TSX' : 'HTML'} source`
+      isFramerFormat ? 'Copy customized Framer Code Component (.tsx)' : isTsxFormat ? 'Copy customized React TypeScript (.tsx)' : 'Copy customized HTML',
+      `Locked — Pay ${priceLabel} to copy ${isFramerFormat ? 'Framer' : isTsxFormat ? 'React TSX' : 'HTML'} source`
+    );
+
+    const studioFramerBtn = document.getElementById('studioFramerBtn');
+    setLockedButtonLabel(
+      studioFramerBtn,
+      'Framer',
+      unlocked,
+      'Copy ready-to-paste Framer Code Component (.tsx) with addPropertyControls',
+      `Locked — Pay ${priceLabel} to copy for Framer`
     );
 
     const studioFigmaBtn = document.getElementById('studioFigmaBtn');
@@ -2369,6 +2397,15 @@
         unlocked,
         'Download React TypeScript .tsx',
         `Locked — Pay ${priceLabel} to download React TypeScript .tsx`
+      );
+    });
+    document.querySelectorAll('.btn-copy-framer').forEach(btn => {
+      setLockedButtonLabel(
+        btn,
+        'Framer',
+        unlocked,
+        'Copy Framer Code Component (.tsx)',
+        `Locked — Pay ${priceLabel} to copy Framer Code Component`
       );
     });
     document.querySelectorAll('.btn-open-figma').forEach(btn => {
@@ -2666,7 +2703,7 @@
   }
 
   async function exportComponentHtml(comp, format = studioCodeFormat) {
-    const fmt = format === 'tsx' ? 'tsx' : 'html';
+    const fmt = format === 'framer' ? 'framer' : format === 'tsx' ? 'tsx' : 'html';
     const liveComp = (comp && compMap.get(comp.id)) || comp;
     if (!accessState.unlocked || !liveComp || liveComp.locked) {
       openCheckoutModal(() => exportComponentHtml(liveComp, fmt));
@@ -2679,9 +2716,11 @@
       .split(/\s+/)
       .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
       .join('') || 'FrameVaultComponent';
-    const filename = fmt === 'tsx'
-      ? `${pascalName}.tsx`
-      : `${liveComp.section}-${liveComp.name.replace(/\s+/g, '-')}-custom.html`;
+    const filename = fmt === 'framer'
+      ? `${pascalName}.framer.tsx`
+      : fmt === 'tsx'
+        ? `${pascalName}.tsx`
+        : `${liveComp.section}-${liveComp.name.replace(/\s+/g, '-')}-custom.html`;
 
     try {
       const res = await fetch('/api/export-html', {
@@ -2722,7 +2761,7 @@
   }
 
   async function copyComponentHtml(comp, format = studioCodeFormat) {
-    const fmt = format === 'tsx' ? 'tsx' : 'html';
+    const fmt = format === 'framer' ? 'framer' : format === 'tsx' ? 'tsx' : 'html';
     const liveComp = (comp && compMap.get(comp.id)) || comp;
     if (!accessState.unlocked || !liveComp) {
       openCheckoutModal(() => copyComponentHtml(liveComp, fmt));
@@ -2736,10 +2775,12 @@
         openCheckoutModal(() => copyComponentHtml(liveComp, fmt));
         return;
       }
-      const label = fmt === 'tsx' ? 'React TypeScript (.tsx)' : 'HTML';
-      await copyTextSafe(result.code || result.html, `Copied customized ${label} for ${liveComp.name}`);
+      const toastMsg = fmt === 'framer'
+        ? `Copied Framer Code Component for ${liveComp.name}! In Framer: Assets → Code → New File → Paste`
+        : `Copied customized ${fmt === 'tsx' ? 'React TypeScript (.tsx)' : 'HTML'} for ${liveComp.name}`;
+      await copyTextSafe(result.code || result.html, toastMsg);
     } catch (_) {
-      showToast(`Unable to copy ${fmt === 'tsx' ? 'React TSX' : 'HTML'}`);
+      showToast(`Unable to copy ${fmt === 'framer' ? 'Framer Code Component' : fmt === 'tsx' ? 'React TSX' : 'HTML'}`);
     }
   }
 
