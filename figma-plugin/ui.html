@@ -342,13 +342,13 @@
       </div>
       <div class="field">
         <label for="serverInput">FrameVault Server URL</label>
-        <input id="serverInput" class="input" type="text" value="https://framevault-qtim.onrender.com" />
+        <input id="serverInput" class="input" type="text" value="https://framevault.cloud" />
       </div>
       <div id="authErr" class="err-msg"></div>
       <button id="connectBtn" class="btn-primary">Connect & Load Library</button>
       <div class="helper-link">
         Need a license key? Get All-Access ($4.99) at
-        <a href="https://framevault-qtim.onrender.com" target="_blank" rel="noreferrer">framevault-qtim.onrender.com</a>
+        <a href="https://framevault.cloud" target="_blank" rel="noreferrer">framevault.cloud</a>
       </div>
     </div>
   </div>
@@ -395,8 +395,8 @@
 <script>
   const state = {
     licenseKey: '',
-    serverUrl: 'https://framevault-qtim.onrender.com',
-    mcpUrl: 'https://framevault-qtim.onrender.com/api/mcp',
+    serverUrl: 'https://framevault.cloud',
+    mcpUrl: 'https://framevault.cloud/api/mcp',
     components: [],
     sections: [],
     activeSection: 'all',
@@ -437,7 +437,7 @@
   }
 
   function apiBase() {
-    return String(state.serverUrl || 'https://framevault-qtim.onrender.com').trim().replace(/\/$/, '');
+    return String(state.serverUrl || 'https://framevault.cloud').trim().replace(/\/$/, '');
   }
 
   async function apiGet(path) {
@@ -472,7 +472,7 @@
 
   async function connectAndLoad(licenseKey, serverUrl, silent = false) {
     state.licenseKey = String(licenseKey || '').trim();
-    state.serverUrl = String(serverUrl || 'https://framevault-qtim.onrender.com').trim().replace(/\/$/, '');
+    state.serverUrl = String(serverUrl || 'https://framevault.cloud').trim().replace(/\/$/, '');
     if (!state.licenseKey) {
       if (!silent) els.authErr.textContent = 'Enter your FrameVault license key.';
       return;
@@ -796,7 +796,7 @@
       if (msg.serverUrl) els.serverInput.value = msg.serverUrl;
       if (msg.licenseKey) {
         els.licenseInput.value = msg.licenseKey;
-        connectAndLoad(msg.licenseKey, msg.serverUrl || 'https://framevault-qtim.onrender.com', true);
+        connectAndLoad(msg.licenseKey, msg.serverUrl || 'https://framevault.cloud', true);
       } else {
         showAuth('');
       }

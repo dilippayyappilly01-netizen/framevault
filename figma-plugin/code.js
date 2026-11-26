@@ -29,7 +29,7 @@ async function sendInitialState() {
   figma.ui.postMessage({
     type: 'init-state',
     licenseKey: licenseKey || '',
-    serverUrl: serverUrl || 'https://framevault-qtim.onrender.com',
+    serverUrl: serverUrl || 'https://framevault.cloud',
     editorType: figma.editorType,
     selectedFrameVaultId
   });
@@ -52,7 +52,7 @@ figma.on('selectionchange', () => {
 });
 
 function buildMcpDescription(meta) {
-  const mcpUrl = meta.mcpUrl || 'https://framevault-qtim.onrender.com/api/mcp';
+  const mcpUrl = meta.mcpUrl || 'https://framevault.cloud/api/mcp';
   return [
     `FrameVault Component: ${meta.title || meta.name} (${meta.section})`,
     `Component ID: ${meta.id}`,
@@ -101,7 +101,7 @@ figma.ui.onmessage = async (msg) => {
   if (msg.type === 'save-auth') {
     await Promise.all([
       figma.clientStorage.setAsync(STORAGE_KEY_LICENSE, String(msg.licenseKey || '')),
-      figma.clientStorage.setAsync(STORAGE_KEY_SERVER, String(msg.serverUrl || 'https://framevault-qtim.onrender.com'))
+      figma.clientStorage.setAsync(STORAGE_KEY_SERVER, String(msg.serverUrl || 'https://framevault.cloud'))
     ]);
     return;
   }

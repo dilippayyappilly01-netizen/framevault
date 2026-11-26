@@ -11,6 +11,8 @@
   ],
   "networkAccess": {
     "allowedDomains": [
+      "https://framevault.cloud",
+      "https://www.framevault.cloud",
       "https://framevault-qtim.onrender.com",
       "https://fonts.googleapis.com",
       "https://fonts.gstatic.com",
