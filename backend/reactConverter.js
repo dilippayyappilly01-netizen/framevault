@@ -841,8 +841,11 @@ function convertHtmlToFramerTsx(html, meta = {}) {
   const name = base.componentName;
   const hasImages = base.tsx.includes('imageBasePath?: string;');
 
+  // Remove Next.js 'use client' directive (Framer uses client-side React directly)
+  let framerTsx = base.tsx.replace(/^'use client';\s*\n\s*/m, '');
+
   // Inject Framer import right after React import
-  let framerTsx = base.tsx.replace(
+  framerTsx = framerTsx.replace(
     `import React, { useEffect, useRef } from 'react';`,
     `import React, { useEffect, useRef } from 'react';\nimport { addPropertyControls, ControlType } from 'framer';`
   );
@@ -850,7 +853,7 @@ function convertHtmlToFramerTsx(html, meta = {}) {
   // Add Framer usage header
   framerTsx = framerTsx.replace(
     ' * Converted from FrameVault HTML component to TypeScript + React (.tsx)',
-    ' * FrameVault Framer Code Component (.tsx)\n * In Framer: Assets -> Code -> Create Code File -> Paste -> Drag onto Canvas'
+    ' * FrameVault Framer Code Component (.tsx)\n * In Framer: Assets -> Code -> Create Code File -> Paste -> Save -> Drag onto Canvas'
   );
 
   // Add borderRadius prop to Props interface
@@ -859,7 +862,7 @@ function convertHtmlToFramerTsx(html, meta = {}) {
     '  height?: number | string;\n  /** Corner radius in pixels (controlled from Framer sidebar) */\n  borderRadius?: number;'
   );
 
-  // Add Framer layout sizing JSDoc annotations right above export function
+  // Use `export default function` directly with Framer JSDoc layout annotations above it
   const framerAnnotations = [
     '/**',
     ' * @framerSupportedLayoutWidth any-prefer-fixed',
@@ -867,7 +870,7 @@ function convertHtmlToFramerTsx(html, meta = {}) {
     ' * @framerIntrinsicWidth 800',
     ' * @framerIntrinsicHeight 600',
     ' */',
-    `export function ${name}(`
+    `export default function ${name}(`
   ].join('\n');
   framerTsx = framerTsx.replace(`export function ${name}(`, framerAnnotations);
 
@@ -878,15 +881,11 @@ function convertHtmlToFramerTsx(html, meta = {}) {
   );
   framerTsx = framerTsx.replace(
     `style={{ width, height, ...style }}`,
-    `style={{ width, height, borderRadius, overflow: 'hidden', ...style }}`
+    `style={{ position: 'relative', width, height, borderRadius, overflow: 'hidden', ...style }}`
   );
 
-  // Append defaultProps and addPropertyControls before export default
+  // Replace trailing `export default Name;` with addPropertyControls (NO `.defaultProps` which causes TS2339 in strict TS!)
   const controlsBlock = [
-    `${name}.defaultProps = {`,
-    `  borderRadius: 0,${hasImages ? `\n  imageBasePath: 'images',` : ''}`,
-    `};`,
-    '',
     `addPropertyControls(${name}, {`,
     `  borderRadius: {`,
     `    type: ControlType.Number,`,
@@ -897,9 +896,7 @@ function convertHtmlToFramerTsx(html, meta = {}) {
     `    unit: 'px',`,
     `    defaultValue: 0,`,
     `  },${hasImages ? `\n  imageBasePath: {\n    type: ControlType.String,\n    title: 'Images URL',\n    defaultValue: 'images',\n  },` : ''}`,
-    `});`,
-    '',
-    `export default ${name};`
+    `});`
   ].join('\n');
 
   framerTsx = framerTsx.replace(`export default ${name};`, controlsBlock);
