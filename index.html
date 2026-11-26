@@ -677,8 +677,13 @@
       </div>
 
       <p class="ok-mcp-modal-desc" id="aiPromptCompDesc">
-        Paste this prompt into <strong>Antigravity</strong>, <strong>Claude Code</strong>, <strong>Cursor</strong>, <strong>Codex</strong>, or <strong>Lovable</strong> with the <code>framevault-ui</code> MCP server connected.
+        Paste directly into <strong>Lovable</strong>, <strong>Bolt</strong>, <strong>v0</strong>, <strong>Cursor</strong>, <strong>Claude</strong>, <strong>Codex</strong>, or <strong>ChatGPT</strong> — <strong>no MCP setup required</strong>.
       </p>
+
+      <div class="ok-segmented" id="aiPromptModeTabs" style="width:100%; display:grid; grid-template-columns:1fr 1fr; margin-bottom:10px;" role="tablist">
+        <button type="button" class="ok-seg-btn active" data-ai-prompt-mode="direct">Direct Paste (No MCP)</button>
+        <button type="button" class="ok-seg-btn" data-ai-prompt-mode="mcp">Via MCP Server</button>
+      </div>
 
       <div class="ok-ai-prompt-controls">
         <div class="ok-form-group">
