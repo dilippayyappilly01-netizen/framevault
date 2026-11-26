@@ -3345,7 +3345,7 @@
       : `adapt it to my project's framework, `;
 
     const lines = [
-      `Use the originkit-ui MCP server: read ui://guidelines/design-system, call ${frameworkArg} to fetch "${comp.displayTitle}", inspect my project's CSS variables / Tailwind config, and follow the returned Remix Prompt to ${frameworkClause}adapting its colors and copy cleanly without breaking layout or 60fps animations.`
+      `Use the originkit-ui MCP server: read ui://guidelines/design-system, call ${frameworkArg} to fetch "${comp.displayTitle}", and follow the returned Remix Prompt to ${frameworkClause}rendering ONLY the pure visual/animated component itself with NO invented headlines, captions, or extra text unless I explicitly ask for text, while preserving 60fps animations.`
     ];
 
     if (options.includeStudioEdits) {

@@ -113,7 +113,8 @@ function buildDesignSystemGuide(catalog) {
     '1. Always scope global `html, body` styles to a container wrapper when embedding into a multi-section app.',
     '2. Preserve WebGL/GLSL uniforms, Canvas 2D DPR clamping (`Math.min(devicePixelRatio, 2)`), and CSS 3D `preserve-3d` physics.',
     '3. Map brand colors via CSS custom properties or normalized `vec3(r/255, g/255, b/255)` shader constants rather than CSS filters.',
-    '4. Always clean up `requestAnimationFrame`, `ResizeObserver`, and pointer/wheel listeners on component unmount.'
+    '4. Always clean up `requestAnimationFrame`, `ResizeObserver`, and pointer/wheel listeners on component unmount.',
+    '5. Render ONLY the pure visual/animated component itself — do NOT invent or add extra headlines, captions, labels, or editorial text around it unless the user explicitly asks for text.'
   ].join('\n');
 }
 
@@ -301,7 +302,8 @@ function handleMcpJsonRpc(rpc, { catalog }) {
         `# Component: ${comp.displayTitle} (\`${mcpId}\`)`,
         '',
         `## Remix Prompt (${fw})`,
-        `- Inspect the target project's CSS tokens / Tailwind config before adapting colors and typography.`,
+        `- Render ONLY the pure visual/animated component itself — do NOT invent or add extra headlines, captions, labels, or editorial text around it unless the user explicitly asks for text.`,
+        `- Inspect the target project's CSS tokens / Tailwind config before adapting colors.`,
         `- Scope layout styles to a container wrapper (never leak \`html, body { overflow: hidden }\`).`,
         `- Preserve all ${comp.engine} shaders, physics, and \`requestAnimationFrame\` cleanup hooks.`,
         '',
