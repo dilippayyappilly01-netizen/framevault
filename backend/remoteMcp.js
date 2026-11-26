@@ -55,7 +55,9 @@ function searchCatalog(catalog, args = {}) {
     for (const tok of tokens) {
       if (hay.includes(tok)) score += 10;
       if (tok === 'carousel' && hay.includes('carasol')) score += 10;
-      if (tok === 'sphere' && hay.includes('orb')) score += 8;
+      if ((tok === 'sphere' || tok === 'globe' || tok === 'ball') && hay.includes('orb')) score += 8;
+      if ((tok === 'shader' || tok === 'glsl' || tok === 'bg' || tok === 'backdrop' || tok === 'animated' || tok === 'fluid' || tok === 'gradient') && (hay.includes('background') || hay.includes('webgl'))) score += 8;
+      if ((tok === '3d' || tok === 'three') && (hay.includes('webgl') || hay.includes('3d') || hay.includes('cube') || hay.includes('orb'))) score += 6;
     }
     if (score > 0) {
       scored.push({

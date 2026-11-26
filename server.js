@@ -1177,12 +1177,34 @@ function createAppServer(configOverrides = {}, deps = {}) {
         if (!isLocalOrigin || config.publicUrl) {
           const remoteBase = config.publicUrl || origin;
           const remoteMcpUrl = `${remoteBase}/api/mcp`;
+          const displayBearerKey = license.isOwner ? '<YOUR_OWNER_OR_LICENSE_KEY>' : license.licenseKey;
           const remoteConfig = {
             mcpServers: {
               'originkit-ui': {
                 url: remoteMcpUrl,
                 headers: {
-                  Authorization: `Bearer ${license.licenseKey}`
+                  Authorization: `Bearer ${displayBearerKey}`
+                }
+              }
+            }
+          };
+          const claudeRemoteConfig = {
+            mcpServers: {
+              'originkit-ui': {
+                type: 'http',
+                url: remoteMcpUrl,
+                headers: {
+                  Authorization: `Bearer ${displayBearerKey}`
+                }
+              }
+            }
+          };
+          const antigravityRemoteConfig = {
+            mcpServers: {
+              'originkit-ui': {
+                serverUrl: remoteMcpUrl,
+                headers: {
+                  Authorization: `Bearer ${displayBearerKey}`
                 }
               }
             }
@@ -1192,7 +1214,7 @@ function createAppServer(configOverrides = {}, deps = {}) {
             `url = "${remoteMcpUrl}"`,
             ``,
             `[mcp_servers.originkit-ui.http_headers]`,
-            `Authorization = "Bearer ${license.isOwner ? '<YOUR_OWNER_OR_LICENSE_KEY>' : license.licenseKey}"`
+            `Authorization = "Bearer ${displayBearerKey}"`
           ].join('\n');
           const parsedUnlocked = JSON.parse(mcpInfoCache.unlocked.raw.toString('utf8'));
           const remotePayload = {
@@ -1203,12 +1225,12 @@ function createAppServer(configOverrides = {}, deps = {}) {
               antigravity: {
                 label: 'Antigravity',
                 fileHint: 'mcp_config.json',
-                json: JSON.stringify(remoteConfig, null, 2)
+                json: JSON.stringify(antigravityRemoteConfig, null, 2)
               },
               claude: {
                 label: 'Claude Desktop / Code',
                 fileHint: 'claude_desktop_config.json or .mcp.json',
-                json: JSON.stringify(remoteConfig, null, 2)
+                json: JSON.stringify(claudeRemoteConfig, null, 2)
               },
               cursor: {
                 label: 'Cursor',
