@@ -20,7 +20,38 @@
   let studioCompId = null;
   let studioTab = 'speeds'; // 'speeds' | 'effects' | 'colours' | 'html'
   let studioStageMode = 'live'; // 'live' | 'code' | 'split'
-  let studioCodeFormat = 'html'; // 'html' | 'tsx'
+  let studioCodeFormat = 'html'; // 'html' | 'tsx' | 'framer'
+  let studioBackdropPreset = 'none'; // 'none' | 'dark-grad' | 'indigo' | 'light-paper' | 'warm-sand' | 'sunset'
+
+  const STUDIO_BACKDROPS = {
+    none: '',
+    'dark-grad': 'linear-gradient(135deg, #090b1a 0%, #1a103c 50%, #061826 100%)',
+    indigo: 'radial-gradient(circle at 22% 20%, #4f46e5 0%, #1e1b4b 45%, #090b16 100%)',
+    'light-paper': 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+    'warm-sand': 'linear-gradient(135deg, #fef3c7 0%, #fde68a 48%, #f5d0fe 100%)',
+    sunset: 'linear-gradient(135deg, #ff512f 0%, #dd2476 52%, #1e1b4b 100%)'
+  };
+
+  function applyStudioBlendPreview(comp) {
+    if (!studioViewportFrame || !studioIframe || !comp) return;
+    const cps = comp.controlParameterSet || {};
+    const blend = cps.htmlProperties?.mixBlendMode?.value || 'normal';
+    const feather = Number(cps.effects?.edgeFeather?.value || 0);
+    const blendOn = Boolean(cps.colours?.blendIntoBg?.value) || blend !== 'normal';
+
+    studioViewportFrame.style.background = STUDIO_BACKDROPS[studioBackdropPreset] || '';
+    studioIframe.style.background = blendOn ? 'transparent' : '';
+    studioIframe.style.mixBlendMode = blend !== 'normal' ? blend : '';
+    if (feather > 0) {
+      const inner = Math.max(25, Math.round(100 - feather * 0.65));
+      const maskVal = `radial-gradient(ellipse at center, #000 ${inner}%, transparent 100%)`;
+      studioIframe.style.maskImage = maskVal;
+      studioIframe.style.webkitMaskImage = maskVal;
+    } else {
+      studioIframe.style.maskImage = '';
+      studioIframe.style.webkitMaskImage = '';
+    }
+  }
   let studioViewportSize = 'full'; // 'full' | 'desktop' | 'square' | 'mobile'
   let ctrlSearchQuery = '';
   let reloadTimer = null;
@@ -156,11 +187,13 @@
         glowColor: cps.effects.glowColor.value,
         liquidDistortion: Number(cps.effects.liquidDistortion.value),
         liquidFrequency: Number(cps.effects.liquidFrequency.value),
-        vignette: Number(cps.effects.vignette.value)
+        vignette: Number(cps.effects.vignette.value),
+        edgeFeather: Number(cps.effects.edgeFeather?.value || 0)
       },
       colours: {
         backgroundColor: cps.colours.backgroundColor.value,
         bgChanged: cps.colours.backgroundColor.value !== cps.colours.backgroundColor.defaultValue,
+        blendIntoBg: Boolean(cps.colours.blendIntoBg?.value),
         hueRotate: Number(cps.colours.hueRotate.value),
         saturate: Number(cps.colours.saturate.value),
         brightness: Number(cps.colours.brightness.value),
@@ -1008,6 +1041,8 @@
     `;
 
     // Mount live server-rendered preview iframe
+    studioBackdropPreset = 'none';
+    applyStudioBlendPreview(comp);
     mountPreviewIframe(studioIframe, comp, customizedSet.has(comp.id));
     updateStudioCodeView(comp, true);
     renderStudioControls(comp);
@@ -1243,7 +1278,60 @@
     // TAB 3: COLOURS & PALETTE
     else if (studioTab === 'colours') {
       const col = cps.colours;
+      const currentBlend = cps.htmlProperties.mixBlendMode?.value || 'normal';
+      const currentBlendOn = Boolean(col.blendIntoBg?.value);
+      const currentFeather = Number(cps.effects.edgeFeather?.value || 0);
+      const isAssetOrOrb = comp.section === 'orbs' || comp.section === 'assets' || comp.section === 'cubes';
       html += `
+        <div class="ok-ctrl-section">
+          <div class="ok-ctrl-section-title">
+            <span>BLEND INTO BACKGROUND</span>
+            <span>${isAssetOrOrb ? 'ORBS &amp; ASSETS' : 'COMPOSITING'}</span>
+          </div>
+          <div class="ok-preset-grid">
+            <button class="ok-preset-btn ${!currentBlendOn && currentBlend === 'normal' && currentFeather === 0 ? 'active' : ''}" data-blend-preset="off">
+              <span class="ok-preset-swatch" style="background:#1f2937;"></span> OPAQUE (OFF)
+            </button>
+            <button class="ok-preset-btn ${currentBlend === 'screen' ? 'active' : ''}" data-blend-preset="screen">
+              <span class="ok-preset-swatch" style="background:radial-gradient(circle,#38bdf8,#09090d);"></span> DARK BG (SCREEN)
+            </button>
+            <button class="ok-preset-btn ${currentBlend === 'plus-lighter' ? 'active' : ''}" data-blend-preset="plus-lighter">
+              <span class="ok-preset-swatch" style="background:radial-gradient(circle,#a855f7,#09090d);"></span> ADDITIVE GLOW
+            </button>
+            <button class="ok-preset-btn ${currentBlend === 'multiply' ? 'active' : ''}" data-blend-preset="multiply">
+              <span class="ok-preset-swatch" style="background:linear-gradient(135deg,#f8fafc,#94a3b8);"></span> LIGHT BG (MULTIPLY)
+            </button>
+            <button class="ok-preset-btn ${currentBlendOn && currentBlend === 'normal' && currentFeather > 0 ? 'active' : ''}" data-blend-preset="feather">
+              <span class="ok-preset-swatch" style="background:radial-gradient(circle,#ffffff 35%,transparent 75%); border:1px solid #555;"></span> SOFT EDGE FEATHER
+            </button>
+          </div>
+          ${buildSliderFieldHtml('ef_edgeFeather', 'Edge Feather Mask', currentFeather, 0, 100, 1, '%')}
+          <div class="ok-ctrl-section-title" style="margin-top:10px; opacity:0.8;">
+            <span>PREVIEW BACKDROP (STUDIO TEST)</span>
+            <span>LIVE</span>
+          </div>
+          <div class="ok-preset-grid">
+            <button class="ok-preset-btn ${studioBackdropPreset === 'none' ? 'active' : ''}" data-stage-backdrop="none">
+              <span class="ok-preset-swatch" style="background:#0a0a0e;"></span> DEFAULT
+            </button>
+            <button class="ok-preset-btn ${studioBackdropPreset === 'dark-grad' ? 'active' : ''}" data-stage-backdrop="dark-grad">
+              <span class="ok-preset-swatch" style="background:linear-gradient(135deg,#090b1a,#1a103c,#061826);"></span> DARK HERO
+            </button>
+            <button class="ok-preset-btn ${studioBackdropPreset === 'indigo' ? 'active' : ''}" data-stage-backdrop="indigo">
+              <span class="ok-preset-swatch" style="background:radial-gradient(circle at 20% 20%,#4f46e5,#0f172a 70%);"></span> INDIGO MESH
+            </button>
+            <button class="ok-preset-btn ${studioBackdropPreset === 'light-paper' ? 'active' : ''}" data-stage-backdrop="light-paper">
+              <span class="ok-preset-swatch" style="background:linear-gradient(135deg,#f8fafc,#e2e8f0);"></span> LIGHT SAAS
+            </button>
+            <button class="ok-preset-btn ${studioBackdropPreset === 'warm-sand' ? 'active' : ''}" data-stage-backdrop="warm-sand">
+              <span class="ok-preset-swatch" style="background:linear-gradient(135deg,#fef3c7,#fde68a,#f5d0fe);"></span> WARM PAPER
+            </button>
+            <button class="ok-preset-btn ${studioBackdropPreset === 'sunset' ? 'active' : ''}" data-stage-backdrop="sunset">
+              <span class="ok-preset-swatch" style="background:linear-gradient(135deg,#ff512f,#dd2476,#1e1b4b);"></span> SUNSET MESH
+            </button>
+          </div>
+        </div>
+
         <div class="ok-ctrl-section">
           <div class="ok-ctrl-section-title">
             <span>NON-BLUE THEME PRESETS</span>
@@ -1458,7 +1546,11 @@
     // Effects
     else if (id.startsWith('ef_')) {
       const key = id.slice(3);
+      if (key === 'edgeFeather' && !cps.effects.edgeFeather) {
+        cps.effects.edgeFeather = { label: 'Edge Feather Mask', type: 'range', min: 0, max: 100, step: 1, value: 0, defaultValue: 0 };
+      }
       if (cps.effects[key]) cps.effects[key].value = newVal;
+      if (key === 'edgeFeather') applyStudioBlendPreview(comp);
     } else if (id.startsWith('cef_')) {
       const idx = parseInt(id.slice(4), 10);
       if (cps.effects.componentEffects[idx]) {
@@ -1647,9 +1739,67 @@
           col.invert.value = col.invert.defaultValue;
           col.tintOpacity.value = 0;
         }
+        if (studioCompId) {
+          applyStudioBlendPreview(comp);
+        }
         renderStudioControls(comp);
         pushLiveUpdateToStudio(comp, false);
         showToast(`APPLIED ${preset.toUpperCase()} PALETTE`);
+      });
+    });
+
+    // Blend-Into-Background 1-Click Presets
+    studioControlsScroll.querySelectorAll('[data-blend-preset]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.getAttribute('data-blend-preset');
+        const cps = comp.controlParameterSet;
+        if (!cps.colours.blendIntoBg) {
+          cps.colours.blendIntoBg = { label: 'Blend Into Background', type: 'toggle', value: false, defaultValue: false };
+        }
+        if (!cps.effects.edgeFeather) {
+          cps.effects.edgeFeather = { label: 'Edge Feather Mask', type: 'range', min: 0, max: 100, step: 1, value: 0, defaultValue: 0 };
+        }
+
+        if (mode === 'off') {
+          cps.colours.blendIntoBg.value = false;
+          cps.htmlProperties.mixBlendMode.value = 'normal';
+          cps.effects.edgeFeather.value = 0;
+          studioBackdropPreset = 'none';
+        } else if (mode === 'screen') {
+          cps.colours.blendIntoBg.value = true;
+          cps.htmlProperties.mixBlendMode.value = 'screen';
+          cps.effects.edgeFeather.value = 30;
+          if (studioBackdropPreset === 'none') studioBackdropPreset = 'indigo';
+        } else if (mode === 'plus-lighter') {
+          cps.colours.blendIntoBg.value = true;
+          cps.htmlProperties.mixBlendMode.value = 'plus-lighter';
+          cps.effects.edgeFeather.value = 35;
+          if (studioBackdropPreset === 'none') studioBackdropPreset = 'dark-grad';
+        } else if (mode === 'multiply') {
+          cps.colours.blendIntoBg.value = true;
+          cps.htmlProperties.mixBlendMode.value = 'multiply';
+          cps.effects.edgeFeather.value = 25;
+          if (studioBackdropPreset === 'none') studioBackdropPreset = 'warm-sand';
+        } else if (mode === 'feather') {
+          cps.colours.blendIntoBg.value = true;
+          cps.htmlProperties.mixBlendMode.value = 'normal';
+          cps.effects.edgeFeather.value = 50;
+          if (studioBackdropPreset === 'none') studioBackdropPreset = 'dark-grad';
+        }
+
+        applyStudioBlendPreview(comp);
+        renderStudioControls(comp);
+        pushLiveUpdateToStudio(comp, false);
+        showToast(mode === 'off' ? 'BACKGROUND BLEND OFF' : `BLENDING INTO BACKGROUND (${mode.toUpperCase()})`);
+      });
+    });
+
+    // Studio Test Backdrop Preview Swatches
+    studioControlsScroll.querySelectorAll('[data-stage-backdrop]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        studioBackdropPreset = btn.getAttribute('data-stage-backdrop') || 'none';
+        applyStudioBlendPreview(comp);
+        renderStudioControls(comp);
       });
     });
 

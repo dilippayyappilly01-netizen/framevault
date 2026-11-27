@@ -1034,6 +1034,12 @@ function createAppServer(configOverrides = {}, deps = {}) {
         if (l.blendMode && allowedBlends.has(l.blendMode) && l.blendMode !== 'normal') {
           style.push(`mix-blend-mode:${l.blendMode}`);
         }
+        const feather = Math.max(0, Math.min(100, Math.round(Number(l.edgeFeather) || 0)));
+        if (feather > 0) {
+          const innerStop = Math.max(25, Math.round(100 - feather * 0.65));
+          const maskVal = `radial-gradient(ellipse at center, #000 ${innerStop}%, transparent 100%)`;
+          style.push(`mask-image:${maskVal}`, `-webkit-mask-image:${maskVal}`);
+        }
 
         if (l.kind === 'component') {
           const comp = catalog.byId.get(String(l.compId || ''));

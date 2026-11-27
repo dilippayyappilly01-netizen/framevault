@@ -617,6 +617,13 @@ function convertHtmlToReactTsx(html, meta = {}) {
   const hasScript = Boolean(runtimeCode.trim());
   const hasFonts = parts.fontLinks.length > 0;
 
+  const blendMatch = String(html || '').match(/data-fv-blend="([^"]+)"/i);
+  const transpMatch = String(html || '').match(/data-fv-transparent="([01])"/i);
+  const featherMatch = String(html || '').match(/data-fv-feather="(\d+)"/i);
+  const defaultBlendMode = blendMatch ? blendMatch[1] : 'normal';
+  const defaultTransparentBg = transpMatch ? transpMatch[1] === '1' : false;
+  const defaultEdgeFeather = featherMatch ? Math.max(0, Math.min(100, Number(featherMatch[1]) || 0)) : 0;
+
   const propsLines = [
     `export interface ${componentName}Props {`,
     `  /** Additional CSS class names for the root container */`,
@@ -626,7 +633,13 @@ function convertHtmlToReactTsx(html, meta = {}) {
     `  /** Container width (default: '100%') */`,
     `  width?: number | string;`,
     `  /** Container height (default: '100%') */`,
-    `  height?: number | string;`
+    `  height?: number | string;`,
+    `  /** Blend mode to composite seamlessly into parent background (e.g. 'screen', 'plus-lighter', 'multiply') */`,
+    `  blendMode?: React.CSSProperties['mixBlendMode'];`,
+    `  /** Remove opaque wrapper background so orb/asset blends into parent background */`,
+    `  transparentBackground?: boolean;`,
+    `  /** Radial edge feathering (0-100) to softly fade rectangular edges into any background */`,
+    `  edgeFeather?: number;`
   ];
   if (parts.hasLocalImages) {
     propsLines.push(
@@ -800,8 +813,8 @@ ${fontEffectBlock}${imgBaseLine}
       : '';
 
   const destructuredProps = parts.hasLocalImages
-    ? `{ className, style, width = '100%', height = '100%', imageBasePath = 'images' }`
-    : `{ className, style, width = '100%', height = '100%' }`;
+    ? `{ className, style, width = '100%', height = '100%', blendMode = ${JSON.stringify(defaultBlendMode)}, transparentBackground = ${defaultTransparentBg}, edgeFeather = ${defaultEdgeFeather}, imageBasePath = 'images' }`
+    : `{ className, style, width = '100%', height = '100%', blendMode = ${JSON.stringify(defaultBlendMode)}, transparentBackground = ${defaultTransparentBg}, edgeFeather = ${defaultEdgeFeather} }`;
 
   const tsx = `'use client';
 
@@ -822,11 +835,25 @@ export function ${componentName}(${destructuredProps}: ${componentName}Props) {
 
 ${effectBody}
 
+  const blendStyle: React.CSSProperties = {};
+  if (blendMode && blendMode !== 'normal') {
+    blendStyle.mixBlendMode = blendMode;
+    blendStyle.background = 'transparent';
+  } else if (transparentBackground) {
+    blendStyle.background = 'transparent';
+  }
+  if (edgeFeather > 0) {
+    const inner = Math.max(25, Math.round(100 - edgeFeather * 0.65));
+    const mask = \`radial-gradient(ellipse at center, #000 \${inner}%, transparent 100%)\`;
+    blendStyle.maskImage = mask;
+    blendStyle.WebkitMaskImage = mask;
+  }
+
   return (
     <div
       ref={containerRef}
       className={className ? \`${scopeClass} \${className}\` : '${scopeClass}'}
-      style={{ width, height, ...style }}
+      style={{ width, height, ...blendStyle, ...style }}
     >
       <style dangerouslySetInnerHTML={{ __html: SCOPED_STYLES }} />
 ${indentedJsx}
@@ -888,13 +915,29 @@ function convertHtmlToFramerTsx(html, meta = {}) {
     `height = '100%', borderRadius = 0`
   );
   framerTsx = framerTsx.replace(
-    `style={{ width, height, ...style }}`,
-    `style={{ position: 'relative', width, height, borderRadius, overflow: 'hidden', ...style }}`
+    `style={{ width, height, ...blendStyle, ...style }}`,
+    `style={{ position: 'relative', width, height, borderRadius, overflow: 'hidden', ...blendStyle, ...style }}`
   );
 
   // Replace trailing `export default Name;` with addPropertyControls (NO `.defaultProps` which causes TS2339 in strict TS!)
   const controlsBlock = [
     `addPropertyControls(${name}, {`,
+    `  blendMode: {`,
+    `    type: ControlType.Enum,`,
+    `    title: 'Blend BG',`,
+    `    options: ['normal', 'screen', 'plus-lighter', 'lighten', 'multiply', 'overlay'],`,
+    `    optionTitles: ['Normal', 'Screen (Dark BG)', 'Glow (Plus-Lighter)', 'Lighten', 'Multiply (Light BG)', 'Overlay'],`,
+    `    defaultValue: 'normal',`,
+    `  },`,
+    `  edgeFeather: {`,
+    `    type: ControlType.Number,`,
+    `    title: 'Edge Feather',`,
+    `    min: 0,`,
+    `    max: 100,`,
+    `    step: 1,`,
+    `    unit: '%',`,
+    `    defaultValue: 0,`,
+    `  },`,
     `  borderRadius: {`,
     `    type: ControlType.Number,`,
     `    title: 'Radius',`,

@@ -253,6 +253,7 @@
       opacity: opts.opacity !== undefined ? opts.opacity : 100,
       borderRadius: opts.borderRadius !== undefined ? opts.borderRadius : borderRadius,
       blendMode: opts.blendMode || 'normal',
+      edgeFeather: opts.edgeFeather !== undefined ? opts.edgeFeather : 0,
       hueRotate: 0,
       brightness: 100,
       saturate: 100,
@@ -934,6 +935,7 @@
                 <button type="button" data-nt="up" title="Bring Forward">&uarr;</button>
                 <button type="button" data-nt="down" title="Send Backward">&darr;</button>
                 <button type="button" data-nt="bg" title="Fill as Full Background">BG</button>
+                <button type="button" data-nt="blend" title="Cycle Blend Into Background (Dark BG / Light BG / Off)">Blend</button>
                 <button type="button" data-nt="studio" title="Customize in Parametric Studio">Studio</button>
                 <button type="button" data-nt="del" class="ok-canvas-danger-text" title="Delete">&times;</button>
               </div>
@@ -996,6 +998,21 @@
       if (innerEl) {
         innerEl.style.borderRadius = `${l.borderRadius || 0}px`;
         innerEl.style.filter = l.kind === 'component' ? buildFilterCss(l) : '';
+        const feather = Math.max(0, Math.min(100, Number(l.edgeFeather) || 0));
+        if (l.kind === 'component' && feather > 0) {
+          const innerStop = Math.max(25, Math.round(100 - feather * 0.65));
+          const maskVal = `radial-gradient(ellipse at center, #000 ${innerStop}%, transparent 100%)`;
+          innerEl.style.maskImage = maskVal;
+          innerEl.style.webkitMaskImage = maskVal;
+        } else {
+          innerEl.style.maskImage = '';
+          innerEl.style.webkitMaskImage = '';
+        }
+        if (l.kind === 'component' && ((l.blendMode && l.blendMode !== 'normal') || feather > 0)) {
+          innerEl.style.background = 'transparent';
+        } else {
+          innerEl.style.background = '';
+        }
       }
 
       const labelEl = nodeEl.querySelector('.ok-canvas-nt-label');
@@ -1045,6 +1062,28 @@
         else if (act === 'up') shiftLayerZ(layerId, 1);
         else if (act === 'down') shiftLayerZ(layerId, -1);
         else if (act === 'bg') applyLayoutPreset(layerId, 'full-bg');
+        else if (act === 'blend') {
+          const layer = state.layers.find(x => x.id === layerId);
+          if (layer) {
+            pushHistory();
+            if (!layer.blendMode || layer.blendMode === 'normal') {
+              layer.blendMode = 'screen';
+              layer.edgeFeather = 30;
+              toast(`Blended "${layer.name}" into Dark BG (Screen + 30% feather)`);
+            } else if (layer.blendMode === 'screen') {
+              layer.blendMode = 'multiply';
+              layer.edgeFeather = 25;
+              toast(`Blended "${layer.name}" into Light BG (Multiply + 25% feather)`);
+            } else {
+              layer.blendMode = 'normal';
+              layer.edgeFeather = 0;
+              toast(`Blend off for "${layer.name}"`);
+            }
+            syncArtboardNodes();
+            renderInspector();
+            saveToStorage();
+          }
+        }
         else if (act === 'del') deleteLayer(layerId);
         else if (act === 'studio') {
           const layer = state.layers.find(x => x.id === layerId);
@@ -1359,6 +1398,20 @@
         </div>
         ${geometryHtml}
         <div class="ok-insp-group">
+          <div class="ok-insp-group-title">Blend Into Background</div>
+          <div class="ok-insp-comp-actions" style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:8px;">
+            <button type="button" class="ok-btn-secondary ${(!layer.blendMode || layer.blendMode === 'normal') && !(layer.edgeFeather > 0) ? 'is-active' : ''}" data-insp-blend-preset="off" style="height:28px;font-size:11px;padding:0 6px;">Off</button>
+            <button type="button" class="ok-btn-secondary ${layer.blendMode === 'screen' ? 'is-active' : ''}" data-insp-blend-preset="screen" style="height:28px;font-size:11px;padding:0 6px;" title="Makes dark/black backgrounds transparent">Dark BG</button>
+            <button type="button" class="ok-btn-secondary ${layer.blendMode === 'plus-lighter' ? 'is-active' : ''}" data-insp-blend-preset="plus-lighter" style="height:28px;font-size:11px;padding:0 6px;" title="Additive luminous glow blend">Glow</button>
+            <button type="button" class="ok-btn-secondary ${layer.blendMode === 'multiply' ? 'is-active' : ''}" data-insp-blend-preset="multiply" style="height:28px;font-size:11px;padding:0 6px;" title="Makes light/white backgrounds transparent">Light BG</button>
+            <button type="button" class="ok-btn-secondary ${(!layer.blendMode || layer.blendMode === 'normal') && (layer.edgeFeather > 0) ? 'is-active' : ''}" data-insp-blend-preset="feather" style="height:28px;font-size:11px;padding:0 6px;grid-column:span 2;" title="Softly feather edges into any background">Soft Feather</button>
+          </div>
+          <div class="ok-insp-row">
+            <label>Edge Feather <span class="ok-insp-val" id="valInspFeather">${layer.edgeFeather || 0}%</span></label>
+            <input type="range" id="inspFeather" min="0" max="100" value="${layer.edgeFeather || 0}">
+          </div>
+        </div>
+        <div class="ok-insp-group">
           <div class="ok-insp-group-title">Appearance &amp; Blending</div>
           <div class="ok-insp-row">
             <label>Opacity <span class="ok-insp-val" id="valInspOpacity">${layer.opacity}%</span></label>
@@ -1410,10 +1463,37 @@
         renderAll();
       });
       bindRange('inspOpacity', 'valInspOpacity', '%', v => { layer.opacity = v; });
+      bindRange('inspFeather', 'valInspFeather', '%', v => { layer.edgeFeather = v; });
       bindRange('inspHue', 'valInspHue', '°', v => { layer.hueRotate = v; });
       bindRange('inspBright', 'valInspBright', '%', v => { layer.brightness = v; });
       bindRange('inspSat', 'valInspSat', '%', v => { layer.saturate = v; });
       bindRange('inspBlur', 'valInspBlur', 'px', v => { layer.blur = v; });
+      inspectorBodyEl.querySelectorAll('[data-insp-blend-preset]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          pushHistory();
+          const preset = btn.getAttribute('data-insp-blend-preset');
+          if (preset === 'off') {
+            layer.blendMode = 'normal';
+            layer.edgeFeather = 0;
+          } else if (preset === 'screen') {
+            layer.blendMode = 'screen';
+            layer.edgeFeather = 30;
+          } else if (preset === 'plus-lighter') {
+            layer.blendMode = 'plus-lighter';
+            layer.edgeFeather = 35;
+          } else if (preset === 'multiply') {
+            layer.blendMode = 'multiply';
+            layer.edgeFeather = 25;
+          } else if (preset === 'feather') {
+            layer.blendMode = 'normal';
+            layer.edgeFeather = 50;
+          }
+          syncArtboardNodes();
+          renderInspector();
+          saveToStorage();
+          toast(preset === 'off' ? 'Blend reset to normal' : `Blended "${layer.name}" into background (${preset})`);
+        });
+      });
       document.getElementById('inspBlend')?.addEventListener('change', (e) => {
         pushHistory();
         layer.blendMode = e.target.value;

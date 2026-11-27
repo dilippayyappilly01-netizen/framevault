@@ -177,6 +177,31 @@ function mergeControlParameterSet(canonicalCps, userCps) {
     });
   }
 
+  if (userCps.colours && typeof userCps.colours === 'object') {
+    if (userCps.colours.blendIntoBg && typeof userCps.colours.blendIntoBg === 'object') {
+      merged.colours.blendIntoBg = {
+        label: 'Blend Into Background',
+        type: 'toggle',
+        value: Boolean(userCps.colours.blendIntoBg.value),
+        defaultValue: false
+      };
+    }
+  }
+  if (userCps.effects && typeof userCps.effects === 'object') {
+    if (userCps.effects.edgeFeather && typeof userCps.effects.edgeFeather === 'object') {
+      const n = Number(userCps.effects.edgeFeather.value);
+      merged.effects.edgeFeather = {
+        label: 'Edge Feather Mask',
+        type: 'range',
+        min: 0,
+        max: 100,
+        step: 1,
+        value: Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 0,
+        defaultValue: 0
+      };
+    }
+  }
+
   return merged;
 }
 
@@ -201,11 +226,13 @@ function getRuntimeStatePayload(cps) {
       glowColor: cps.effects.glowColor.value,
       liquidDistortion: Number(cps.effects.liquidDistortion.value),
       liquidFrequency: Number(cps.effects.liquidFrequency.value),
-      vignette: Number(cps.effects.vignette.value)
+      vignette: Number(cps.effects.vignette.value),
+      edgeFeather: Number(cps.effects.edgeFeather?.value || 0)
     },
     colours: {
       backgroundColor: cps.colours.backgroundColor.value,
       bgChanged: cps.colours.backgroundColor.value !== cps.colours.backgroundColor.defaultValue,
+      blendIntoBg: Boolean(cps.colours.blendIntoBg?.value),
       hueRotate: Number(cps.colours.hueRotate.value),
       saturate: Number(cps.colours.saturate.value),
       brightness: Number(cps.colours.brightness.value),
@@ -503,9 +530,17 @@ function compileComponentHtml(comp, userCps = null, options = {}) {
       document.body.setAttribute('data-theme', st.htmlProps.dataTheme || 'dark-carbon');
       document.body.setAttribute('data-speed', st.speeds.animationSpeed);
 
-      if (st.colours.bgChanged) {
+      if (st.colours.blendIntoBg) {
+        document.documentElement.style.background = 'transparent';
+        document.body.style.background = 'transparent';
+        document.body.style.backgroundColor = 'transparent';
+      } else if (st.colours.bgChanged) {
+        document.documentElement.style.background = '';
+        document.body.style.background = '';
         document.body.style.backgroundColor = st.colours.backgroundColor;
       } else {
+        document.documentElement.style.background = '';
+        document.body.style.background = '';
         document.body.style.backgroundColor = '';
       }
       document.body.style.overflow = st.htmlProps.overflow;
@@ -541,6 +576,15 @@ function compileComponentHtml(comp, userCps = null, options = {}) {
           : '';
         stageEl.style.cursor = st.htmlProps.cursor !== 'default' ? st.htmlProps.cursor : '';
         stageEl.style.mixBlendMode = st.htmlProps.mixBlendMode !== 'normal' ? st.htmlProps.mixBlendMode : '';
+        if (st.effects.edgeFeather > 0) {
+          const innerStop = Math.max(25, Math.round(100 - st.effects.edgeFeather * 0.65));
+          const maskVal = \`radial-gradient(ellipse at center, #000 \${innerStop}%, transparent 100%)\`;
+          stageEl.style.maskImage = maskVal;
+          stageEl.style.webkitMaskImage = maskVal;
+        } else {
+          stageEl.style.maskImage = '';
+          stageEl.style.webkitMaskImage = '';
+        }
 
         const ef = st.effects;
         const col = st.colours;
@@ -648,6 +692,12 @@ function compileComponentHtml(comp, userCps = null, options = {}) {
 
   html = html.replace(/<head>/i, `<head>\n${headInjection}`);
   html = html.replace(/<body([^>]*)>/i, `<body$1>\n${bodyInjection}`);
+
+  // Inject blend metadata attributes on <body> so React/Framer converters preserve Studio blend defaults
+  if (state.colours.blendIntoBg || state.htmlProps.mixBlendMode !== 'normal' || state.effects.edgeFeather > 0) {
+    const blendAttrs = ` data-fv-blend="${escapeHtml(state.htmlProps.mixBlendMode || 'normal')}" data-fv-transparent="${state.colours.blendIntoBg ? '1' : '0'}" data-fv-feather="${Math.round(state.effects.edgeFeather || 0)}"`;
+    html = html.replace(/<body([^>]*)>/i, `<body$1${blendAttrs}>`);
+  }
 
   return html;
 }
