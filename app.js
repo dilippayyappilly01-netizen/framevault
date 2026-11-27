@@ -654,6 +654,9 @@
             <button class="ok-btn-secondary btn-copy-framer ${accessState.unlocked ? '' : 'ok-btn-locked'}" title="${accessState.unlocked ? 'Copy Framer Code Component (.tsx)' : `Locked — Pay ${escapeHtml(accessState.price || '$4.99')} to copy Framer Code Component`}">
               ${accessState.unlocked ? 'Framer' : `${LOCK_ICON_SVG}<span>Framer</span>`}
             </button>
+            <button class="ok-btn-secondary btn-card-ai-prompt ${accessState.unlocked ? '' : 'ok-btn-locked'}" title="${accessState.unlocked ? 'Open AI Remix Prompt (framevault-ui MCP)' : `Locked — Pay ${escapeHtml(accessState.price || '$4.99')} to unlock AI Remix Prompt`}">
+              ${accessState.unlocked ? 'AI Prompt' : `${LOCK_ICON_SVG}<span>AI Prompt</span>`}
+            </button>
           </div>
         </div>
       </article>
@@ -876,6 +879,10 @@
       const framerBtn = cardEl.querySelector('.btn-copy-framer');
       if (framerBtn) {
         framerBtn.addEventListener('click', () => copyComponentHtml(comp, 'framer'));
+      }
+      const aiPromptCardBtn = cardEl.querySelector('.btn-card-ai-prompt');
+      if (aiPromptCardBtn) {
+        aiPromptCardBtn.addEventListener('click', () => openAiPromptModal(comp));
       }
       const figmaBtn = cardEl.querySelector('.btn-open-figma');
       if (figmaBtn) {
@@ -2571,6 +2578,15 @@
         unlocked,
         'Copy Framer Code Component (.tsx)',
         `Locked — Pay ${priceLabel} to copy Framer Code Component`
+      );
+    });
+    document.querySelectorAll('.btn-card-ai-prompt').forEach(btn => {
+      setLockedButtonLabel(
+        btn,
+        'AI Prompt',
+        unlocked,
+        'Open AI Remix Prompt (framevault-ui MCP)',
+        `Locked — Pay ${priceLabel} to unlock AI Remix Prompt`
       );
     });
     document.querySelectorAll('.btn-open-figma').forEach(btn => {
