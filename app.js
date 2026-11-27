@@ -3634,90 +3634,16 @@
     );
   }
 
-  let activeAiPromptMode = 'direct'; // 'direct' (no MCP needed) | 'mcp'
-  let aiPromptFetchSeq = 0;
-
-  function buildDirectPromptText(comp, sourceResult, options = {}) {
-    const framework = String(options.targetFramework || '').trim();
-    const isHtml = framework.toLowerCase().includes('html');
-    const lang = isHtml ? 'html' : 'tsx';
-    const filename = sourceResult?.filename || (isHtml ? `${comp.name}.html` : `${comp.name}.tsx`);
-    const compName = sourceResult?.componentName || filename.replace(/\.tsx$/i, '');
-    const code = String(sourceResult?.code || sourceResult?.tsx || sourceResult?.html || '').trim();
-
-    const fwLine = framework
-      ? `Target framework: ${framework}.`
-      : `Adapt cleanly to my project's framework (React / Next.js / Vite / TypeScript).`;
-
-    const actionLine = isHtml
-      ? `Add this exact standalone HTML/WebGL component ("${comp.displayTitle}") to my page:`
-      : `Create \`src/components/${filename}\` with the exact code below and render it inside a full-viewport container (\`<div style={{ width: '100vw', height: '100vh' }}><${compName} /></div>\`) on my page:`;
-
-    const lines = [
-      `Add this exact FrameVault component ("${comp.displayTitle}") to my project. ${fwLine}`,
-      '',
-      'Strict rules:',
-      '- Render ONLY this pure visual/animated component itself — do NOT invent or add extra headlines, captions, labels, or editorial text around it unless I explicitly ask for text.',
-      '- Keep all WebGL/GLSL shaders, Canvas 2D DPR scaling, CSS 3D physics, and requestAnimationFrame cleanup hooks intact.',
-      '- Scope styles to the component container (do not leak global html/body overflow styles).',
-      '',
-      actionLine,
-      '',
-      '```' + lang,
-      code,
-      '```'
-    ];
-
-    return lines.join('\n');
-  }
-
-  async function syncAiPromptModalText() {
+  function syncAiPromptModalText() {
     const comp = compMap.get(activeAiPromptCompId);
     const textarea = document.getElementById('aiPromptTextarea');
     const fwSelect = document.getElementById('aiPromptFramework');
     const editsCheckbox = document.getElementById('aiPromptIncludeEdits');
-    const descEl = document.getElementById('aiPromptCompDesc');
     if (!comp || !textarea) return;
-
-    document.querySelectorAll('[data-ai-prompt-mode]').forEach(btn => {
-      btn.classList.toggle('active', btn.getAttribute('data-ai-prompt-mode') === activeAiPromptMode);
+    textarea.value = buildMcpPromptText(comp, {
+      targetFramework: fwSelect?.value || '',
+      includeStudioEdits: Boolean(editsCheckbox?.checked)
     });
-
-    if (descEl) {
-      descEl.innerHTML = activeAiPromptMode === 'direct'
-        ? 'Paste directly into <strong>Lovable</strong>, <strong>Bolt</strong>, <strong>v0</strong>, <strong>Cursor</strong>, <strong>Claude</strong>, <strong>Codex</strong>, or <strong>ChatGPT</strong> — <strong>no MCP setup required</strong>.'
-        : 'Paste into <strong>Antigravity</strong>, <strong>Claude Code</strong>, <strong>Cursor</strong>, <strong>Codex</strong>, or <strong>Lovable</strong> with the <code>framevault-ui</code> MCP server connected.';
-    }
-
-    const targetFramework = fwSelect?.value || '';
-    const includeStudioEdits = Boolean(editsCheckbox?.checked);
-
-    if (activeAiPromptMode === 'mcp') {
-      textarea.value = buildMcpPromptText(comp, { targetFramework, includeStudioEdits });
-      return;
-    }
-
-    // Direct Paste mode: fetch real licensed TSX (or HTML) code and embed directly in the prompt
-    const seq = ++aiPromptFetchSeq;
-    const fmt = targetFramework.toLowerCase().includes('html') ? 'html' : 'tsx';
-    textarea.value = `Building self-contained AI prompt for ${comp.displayTitle} (${fmt.toUpperCase()})...`;
-
-    try {
-      const result = await fetchLicensedSource(comp, fmt);
-      if (seq !== aiPromptFetchSeq || activeAiPromptCompId !== comp.id || activeAiPromptMode !== 'direct') return;
-      if (result.locked) {
-        accessState.unlocked = false;
-        syncAccessUI();
-        closeAiPromptModal();
-        openCheckoutModal(() => openAiPromptModal(comp));
-        return;
-      }
-      textarea.value = buildDirectPromptText(comp, result, { targetFramework, includeStudioEdits });
-    } catch (_) {
-      if (seq === aiPromptFetchSeq) {
-        textarea.value = buildMcpPromptText(comp, { targetFramework, includeStudioEdits });
-      }
-    }
   }
 
   function openAiPromptModal(comp) {
@@ -3905,12 +3831,6 @@
     document.getElementById('btnCloseAiPromptModal')?.addEventListener('click', closeAiPromptModal);
     document.getElementById('aiPromptBackdrop')?.addEventListener('click', (e) => {
       if (e.target && e.target.id === 'aiPromptBackdrop') closeAiPromptModal();
-    });
-    document.querySelectorAll('[data-ai-prompt-mode]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        activeAiPromptMode = btn.getAttribute('data-ai-prompt-mode') === 'mcp' ? 'mcp' : 'direct';
-        syncAiPromptModalText();
-      });
     });
     document.getElementById('aiPromptFramework')?.addEventListener('change', syncAiPromptModalText);
     document.getElementById('aiPromptIncludeEdits')?.addEventListener('change', syncAiPromptModalText);
