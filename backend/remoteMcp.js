@@ -205,6 +205,12 @@ function handleMcpJsonRpc(rpc, { catalog }) {
             {
               name: 'search_components',
               description: 'Search the FrameVault 3D/WebGL/Canvas/DOM UI component library by natural-language query, category, or engine.',
+              annotations: {
+                readOnlyHint: true,
+                destructiveHint: false,
+                idempotentHint: true,
+                openWorldHint: false
+              },
               inputSchema: {
                 type: 'object',
                 properties: {
@@ -219,6 +225,12 @@ function handleMcpJsonRpc(rpc, { catalog }) {
             {
               name: 'get_component',
               description: 'Fetch raw standalone HTML or TypeScript React (.tsx) source code + Remix Prompt for a FrameVault component.',
+              annotations: {
+                readOnlyHint: true,
+                destructiveHint: false,
+                idempotentHint: true,
+                openWorldHint: false
+              },
               inputSchema: {
                 type: 'object',
                 properties: {
