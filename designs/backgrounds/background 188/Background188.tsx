@@ -15,6 +15,12 @@ export interface Background188Props {
   width?: number | string;
   /** Container height (default: '100%') */
   height?: number | string;
+  /** Blend mode to composite seamlessly into parent background (e.g. 'screen', 'plus-lighter', 'multiply') */
+  blendMode?: React.CSSProperties['mixBlendMode'];
+  /** Remove opaque wrapper background so orb/asset blends into parent background */
+  transparentBackground?: boolean;
+  /** Radial edge feathering (0-100) to softly fade rectangular edges into any background */
+  edgeFeather?: number;
 }
 
 const SCOPED_STYLES = `
@@ -185,7 +191,7 @@ function initBackground188Runtime(__fvRuntime: ScopedRuntimeContext): void {
 }
 /* eslint-enable */
 
-export function Background188({ className, style, width = '100%', height = '100%' }: Background188Props) {
+export function Background188({ className, style, width = '100%', height = '100%', blendMode = "normal", transparentBackground = false, edgeFeather = 0 }: Background188Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -299,11 +305,25 @@ export function Background188({ className, style, width = '100%', height = '100%
     };
   }, []);
 
+  const blendStyle: React.CSSProperties = {};
+  if (blendMode && blendMode !== 'normal') {
+    blendStyle.mixBlendMode = blendMode;
+    blendStyle.background = 'transparent';
+  } else if (transparentBackground) {
+    blendStyle.background = 'transparent';
+  }
+  if (edgeFeather > 0) {
+    const inner = Math.max(25, Math.round(100 - edgeFeather * 0.65));
+    const mask = `radial-gradient(ellipse at center, #000 ${inner}%, transparent 100%)`;
+    blendStyle.maskImage = mask;
+    blendStyle.WebkitMaskImage = mask;
+  }
+
   return (
     <div
       ref={containerRef}
       className={className ? `fv-backgrounds-background-188 ${className}` : 'fv-backgrounds-background-188'}
-      style={{ width, height, ...style }}
+      style={{ width, height, ...blendStyle, ...style }}
     >
       <style dangerouslySetInnerHTML={{ __html: SCOPED_STYLES }} />
         <canvas id="glCanvas"></canvas>
