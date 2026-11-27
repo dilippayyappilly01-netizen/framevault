@@ -654,9 +654,6 @@
             <button class="ok-btn-secondary btn-copy-framer ${accessState.unlocked ? '' : 'ok-btn-locked'}" title="${accessState.unlocked ? 'Copy Framer Code Component (.tsx)' : `Locked — Pay ${escapeHtml(accessState.price || '$4.99')} to copy Framer Code Component`}">
               ${accessState.unlocked ? 'Framer' : `${LOCK_ICON_SVG}<span>Framer</span>`}
             </button>
-            <button class="ok-btn-secondary btn-open-figma ${accessState.unlocked ? '' : 'ok-btn-locked'}" title="${accessState.unlocked ? 'Edit in Figma (copy editable SVG or design tokens)' : `Locked — Pay ${escapeHtml(accessState.price || '$4.99')} to edit in Figma`}">
-              ${accessState.unlocked ? 'Figma' : `${LOCK_ICON_SVG}<span>Figma</span>`}
-            </button>
           </div>
         </div>
       </article>
