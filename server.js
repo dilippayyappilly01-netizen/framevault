@@ -1427,6 +1427,8 @@ ${nodesHtml}
           const codexToml = [
             `[mcp_servers.framevault-ui]`,
             `url = "${remoteMcpUrl}"`,
+            `startup_timeout_sec = 60`,
+            `tool_timeout_sec = 60`,
             ``,
             `[mcp_servers.framevault-ui.http_headers]`,
             `Authorization = "Bearer ${displayBearerKey}"`
