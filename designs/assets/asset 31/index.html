@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asset 31 — Moonlit Night Sakura Canopy &amp; Drifting Petals</title>
+<style>
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #020105;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<canvas id="sakuraCanvas"></canvas>
+
+<script>
+(() => {
+  const canvas = document.getElementById('sakuraCanvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  // Deterministic PRNG for consistent botanical layout
+  let seed = 31072026;
+  function rand() {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pre-rendered High-Resolution 5-Petal Sakura Blossom Sprites
+  // ---------------------------------------------------------------------------
+  function createBlossomSprite(palette) {
+    const size = 96;
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const g = c.getContext('2d');
+    const cx = size / 2;
+    const cy = size / 2;
+
+    // Soft outer luminous halo
+    const halo = g.createRadialGradient(cx, cy, 4, cx, cy, size * 0.48);
+    halo.addColorStop(0, palette.glow);
+    halo.addColorStop(1, 'rgba(220, 150, 255, 0)');
+    g.fillStyle = halo;
+    g.beginPath();
+    g.arc(cx, cy, size * 0.48, 0, Math.PI * 2);
+    g.fill();
+
+    // 5 notched sakura petals
+    for (let i = 0; i < 5; i++) {
+      g.save();
+      g.translate(cx, cy);
+      g.rotate((i * Math.PI * 2) / 5 - Math.PI / 2);
+
+      const pLen = size * 0.34;
+      const pWid = size * 0.175;
+      const grad = g.createLinearGradient(0, 0, 0, -pLen);
+      grad.addColorStop(0, palette.inner);
+      grad.addColorStop(0.55, palette.mid);
+      grad.addColorStop(1, palette.tip);
+
+      g.fillStyle = grad;
+      g.beginPath();
+      g.moveTo(0, -2);
+      g.bezierCurveTo(-pWid * 1.05, -pLen * 0.25, -pWid * 1.15, -pLen * 0.85, -pWid * 0.24, -pLen);
+      g.lineTo(0, -pLen * 0.84); // classic sakura petal notch
+      g.lineTo(pWid * 0.24, -pLen);
+      g.bezierCurveTo(pWid * 1.15, -pLen * 0.85, pWid * 1.05, -pLen * 0.25, 0, -2);
+      g.closePath();
+      g.fill();
+      g.restore();
+    }
+
+    // Tiny glowing flower center & delicate stamens
+    const coreGrad = g.createRadialGradient(cx, cy, 0, cx, cy, size * 0.10);
+    coreGrad.addColorStop(0, palette.center);
+    coreGrad.addColorStop(1, 'rgba(120, 50, 140, 0)');
+    g.fillStyle = coreGrad;
+    g.beginPath();
+    g.arc(cx, cy, size * 0.10, 0, Math.PI * 2);
+    g.fill();
+
+    return c;
+  }
+
+  const blossomSprites = [
+    // 0: Deep twilight shadow blossom (back layer)
+    createBlossomSprite({
+      inner: '#6a3885',
+      mid: '#9f64be',
+      tip: '#c796e2',
+      center: '#3f1955',
+      glow: 'rgba(155, 85, 200, 0.20)'
+    }),
+    // 1: Rich orchid-lavender blossom (mid layer)
+    createBlossomSprite({
+      inner: '#b46bd8',
+      mid: '#dfa3f8',
+      tip: '#f4d3ff',
+      center: '#7b389d',
+      glow: 'rgba(210, 130, 255, 0.28)'
+    }),
+    // 2: Soft pale sakura pink-lavender (front layer)
+    createBlossomSprite({
+      inner: '#d088ec',
+      mid: '#f2c4ff',
+      tip: '#fff0ff',
+      center: '#944ab5',
+      glow: 'rgba(236, 175, 255, 0.36)'
+    }),
+    // 3: Radiant moonlit rim blossom (highlight layer)
+    createBlossomSprite({
+      inner: '#e5aef9',
+      mid: '#fae2ff',
+      tip: '#ffffff',
+      center: '#b064cf',
+      glow: 'rgba(250, 210, 255, 0.48)'
+    })
+  ];
+
+  // ---------------------------------------------------------------------------
+  // Scene Geometry: Organic Branches, Canopy Blossoms, Ambient Glows, & Petals
+  // ---------------------------------------------------------------------------
+  let width = 1, height = 1, dpr = 1;
+  let branches = [];
+  let blossoms = [];
+  let glowOrbs = [];
+  let petals = [];
+
+  // Mouse wind interaction
+  let mouseX = -9999, mouseY = -9999;
+  let windForceX = 0, windForceY = 0;
+  let lastMouseX = 0, lastMouseY = 0;
+
+  function buildCanopy() {
+    seed = 31072026;
+    branches = [];
+    blossoms = [];
+    glowOrbs = [];
+
+    const W = width;
+    const H = height;
+    const minDim = Math.min(W, H);
+
+    // Recursive organic sakura twig builder
+    function growBranch(x, y, angle, length, thickness, depth, swayGroup) {
+      const steps = 4;
+      const pts = [{ x, y }];
+      let cx = x, cy = y, curAngle = angle;
+
+      for (let s = 1; s <= steps; s++) {
+        curAngle += (rand() - 0.5) * 0.22;
+        cx += Math.cos(curAngle) * (length / steps);
+        cy += Math.sin(curAngle) * (length / steps);
+        pts.push({ x: cx, y: cy });
+      }
+
+      branches.push({
+        pts,
+        thickness,
+        depth,
+        swayGroup,
+        phase: rand() * Math.PI * 2
+      });
+
+      // Spawn blossom clusters along mid-to-outer branches
+      if (depth <= 3) {
+        const clusterCount = depth === 0 ? 7 : depth === 1 ? 6 : 4;
+        for (let c = 0; c < clusterCount; c++) {
+          const frac = 0.25 + rand() * 0.75;
+          const pIdx = Math.min(steps - 1, Math.floor(frac * steps));
+          const pA = pts[pIdx];
+          const pB = pts[pIdx + 1];
+          const tLocal = frac * steps - pIdx;
+          const bx = pA.x + (pB.x - pA.x) * tLocal + (rand() - 0.5) * minDim * 0.09;
+          const by = pA.y + (pB.y - pA.y) * tLocal + (rand() - 0.5) * minDim * 0.09;
+
+          // Keep canopy shaped like a sweeping crescent/dome on the left ~72%
+          const normY = by / H;
+          const rightEdge = W * (0.64 + 0.10 * Math.sin(normY * Math.PI) - 0.14 * Math.pow(Math.max(0, normY - 0.55), 1.6));
+          if (bx > rightEdge + minDim * 0.04) continue;
+
+          const edgeDist = Math.max(0, 1 - Math.abs(bx - rightEdge) / (W * 0.22));
+          const layerRoll = rand();
+          let spriteIdx = 1;
+          if (layerRoll < 0.24) spriteIdx = 0;
+          else if (layerRoll < 0.62) spriteIdx = 1;
+          else if (layerRoll < 0.88) spriteIdx = 2;
+          else spriteIdx = 3;
+          if (edgeDist > 0.55 && rand() < 0.55) spriteIdx = Math.min(3, spriteIdx + 1);
+
+          const baseSize = minDim * (0.020 + rand() * 0.026) * (0.85 + 0.25 * (spriteIdx / 3));
+          blossoms.push({
+            x: bx,
+            y: by,
+            size: baseSize,
+            rot: rand() * Math.PI * 2,
+            spriteIdx,
+            phase: rand() * Math.PI * 2,
+            swayAmp: (0.4 + 0.8 * (1 - depth / 4)) * (minDim * 0.008),
+            shimmerSpeed: 0.7 + rand() * 1.4,
+            alpha: spriteIdx === 0 ? 0.58 + rand() * 0.22 : 0.80 + rand() * 0.20
+          });
+        }
+      }
+
+      if (depth <= 0) return;
+
+      const subBranches = depth >= 3 ? 3 : 2;
+      for (let i = 0; i < subBranches; i++) {
+        const splitFrac = 0.45 + rand() * 0.55;
+        const pIdx = Math.min(steps, Math.round(splitFrac * steps));
+        const origin = pts[pIdx];
+        const spread = (i - (subBranches - 1) / 2) * (0.48 + rand() * 0.26) + (rand() - 0.5) * 0.25;
+        growBranch(
+          origin.x,
+          origin.y,
+          curAngle + spread,
+          length * (0.64 + rand() * 0.16),
+          thickness * 0.64,
+          depth - 1,
+          swayGroup
+        );
+      }
+    }
+
+    // Major sweeping trunks/boughs entering from bottom-left, left, and top-left
+    growBranch(-W * 0.06, H * 1.06, -0.82, minDim * 0.42, minDim * 0.009, 4, 0);
+    growBranch(-W * 0.04, H * 0.82, -0.42, minDim * 0.36, minDim * 0.007, 4, 1);
+    growBranch(-W * 0.05, H * 0.50, -0.10, minDim * 0.38, minDim * 0.007, 4, 2);
+    growBranch(-W * 0.05, H * 0.20,  0.18, minDim * 0.36, minDim * 0.007, 4, 3);
+    growBranch( W * 0.14, -H * 0.06, 0.78, minDim * 0.34, minDim * 0.006, 3, 4);
+    growBranch( W * 0.36, -H * 0.05, 1.08, minDim * 0.28, minDim * 0.005, 3, 5);
+
+    // Extra dense filler canopy clusters so the sakura mass looks full and organic
+    const EXTRA_CLUSTERS = 460;
+    for (let i = 0; i < EXTRA_CLUSTERS; i++) {
+      const ny = rand();
+      const rightEdge = W * (0.65 + 0.09 * Math.sin(ny * Math.PI) - 0.18 * Math.pow(Math.max(0, ny - 0.52), 1.5));
+      // Cluster bias toward middle and outer rim with natural negative-space pockets
+      const u = Math.pow(rand(), 0.78);
+      const bx = u * rightEdge;
+      const by = ny * H;
+
+      // Carve a few organic dark sky pockets inside the canopy (like the video)
+      const pocket1 = Math.hypot((bx - W * 0.30) / (W * 0.14), (by - H * 0.42) / (H * 0.15));
+      const pocket2 = Math.hypot((bx - W * 0.14) / (W * 0.12), (by - H * 0.86) / (H * 0.16));
+      if (pocket1 < 0.72 && rand() < 0.78) continue;
+      if (pocket2 < 0.82 && rand() < 0.72) continue;
+
+      const nearRim = bx > rightEdge * 0.76;
+      let spriteIdx = Math.floor(rand() * 3);
+      if (nearRim && rand() < 0.65) spriteIdx = 3;
+
+      blossoms.push({
+        x: bx,
+        y: by,
+        size: minDim * (0.017 + rand() * 0.027),
+        rot: rand() * Math.PI * 2,
+        spriteIdx,
+        phase: rand() * Math.PI * 2,
+        swayAmp: (0.45 + rand() * 0.75) * (minDim * 0.009),
+        shimmerSpeed: 0.6 + rand() * 1.3,
+        alpha: spriteIdx === 0 ? 0.52 + rand() * 0.25 : 0.78 + rand() * 0.22
+      });
+    }
+
+    // Sort back-to-front so brighter moonlit blossoms layer cleanly over deeper ones
+    blossoms.sort((a, b) => a.spriteIdx - b.spriteIdx);
+
+    // Soft ambient bloom clouds behind the canopy rim
+    for (let i = 0; i < 18; i++) {
+      const ny = (i / 17);
+      const rightEdge = W * (0.62 + 0.08 * Math.sin(ny * Math.PI) - 0.16 * Math.pow(Math.max(0, ny - 0.55), 1.5));
+      glowOrbs.push({
+        x: rightEdge * (0.45 + 0.50 * rand()),
+        y: ny * H,
+        r: minDim * (0.16 + rand() * 0.14),
+        alpha: 0.07 + rand() * 0.06,
+        phase: rand() * Math.PI * 2
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Drifting / Tumbling Loose Sakura Petals
+  // ---------------------------------------------------------------------------
+  function spawnPetal(anywhere) {
+    const W = width;
+    const H = height;
+    const minDim = Math.min(W, H);
+    const ny = rand();
+    const canopyEdge = W * (0.58 + 0.09 * Math.sin(ny * Math.PI));
+
+    const isBokeh = rand() < 0.22;
+    return {
+      x: anywhere ? canopyEdge * 0.4 + rand() * (W - canopyEdge * 0.35) : canopyEdge * (0.65 + rand() * 0.35),
+      y: anywhere ? rand() * H : ny * H,
+      vx: (0.30 + rand() * 0.55) * (minDim / 900),
+      vy: (-0.18 + rand() * 0.52) * (minDim / 900),
+      size: minDim * (isBokeh ? (0.009 + rand() * 0.011) : (0.0055 + rand() * 0.0075)),
+      rot: rand() * Math.PI * 2,
+      rotSpeed: (rand() - 0.5) * 0.035,
+      tumble: rand() * Math.PI * 2,
+      tumbleSpeed: 0.025 + rand() * 0.045,
+      wobblePhase: rand() * Math.PI * 2,
+      wobbleFreq: 0.8 + rand() * 1.4,
+      alpha: isBokeh ? (0.35 + rand() * 0.35) : (0.65 + rand() * 0.35),
+      isBokeh,
+      life: 1.0
+    };
+  }
+
+  function initPetals() {
+    petals = [];
+    for (let i = 0; i < 95; i++) {
+      petals.push(spawnPetal(true));
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Resize & Pointer Interaction
+  // ---------------------------------------------------------------------------
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    width = Math.max(1, Math.floor(window.innerWidth * dpr));
+    height = Math.max(1, Math.floor(window.innerHeight * dpr));
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+    buildCanopy();
+    initPetals();
+  }
+
+  window.addEventListener('resize', resize);
+
+  canvas.addEventListener('pointermove', e => {
+    const x = e.clientX * dpr;
+    const y = e.clientY * dpr;
+    if (mouseX > -9000) {
+      windForceX = Math.max(-18, Math.min(18, windForceX + (x - lastMouseX) * 0.12));
+      windForceY = Math.max(-18, Math.min(18, windForceY + (y - lastMouseY) * 0.12));
+    }
+    mouseX = x;
+    mouseY = y;
+    lastMouseX = x;
+    lastMouseY = y;
+  });
+
+  canvas.addEventListener('pointerdown', e => {
+    const x = e.clientX * dpr;
+    const y = e.clientY * dpr;
+    const minDim = Math.min(width, height);
+    for (let i = 0; i < 14; i++) {
+      const p = spawnPetal(false);
+      p.x = x + (rand() - 0.5) * minDim * 0.08;
+      p.y = y + (rand() - 0.5) * minDim * 0.08;
+      p.vx = (0.6 + rand() * 1.2) * (minDim / 900);
+      p.vy = (-0.5 + rand() * 1.0) * (minDim / 900);
+      petals.push(p);
+    }
+    if (petals.length > 180) petals.splice(0, petals.length - 180);
+  });
+
+  resize();
+
+  // ---------------------------------------------------------------------------
+  // Render Loop
+  // ---------------------------------------------------------------------------
+  const startTime = performance.now();
+
+  function drawPetal(p) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+
+    const scaleY = 0.30 + 0.70 * Math.abs(Math.cos(p.tumble));
+    ctx.scale(1, scaleY);
+
+    if (p.isBokeh) {
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, p.size * 1.6);
+      g.addColorStop(0, `rgba(255, 232, 255, ${p.alpha})`);
+      g.addColorStop(0.45, `rgba(232, 180, 255, ${p.alpha * 0.55})`);
+      g.addColorStop(1, 'rgba(200, 120, 255, 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(0, 0, p.size * 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // Crisp single sakura petal with subtle tip notch & luminous core
+      const s = p.size;
+      const grad = ctx.createLinearGradient(-s, 0, s, 0);
+      grad.addColorStop(0, `rgba(218, 165, 245, ${p.alpha})`);
+      grad.addColorStop(0.55, `rgba(248, 224, 255, ${p.alpha})`);
+      grad.addColorStop(1, `rgba(255, 250, 255, ${p.alpha})`);
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(-s, 0);
+      ctx.bezierCurveTo(-s * 0.4, -s * 0.75, s * 0.65, -s * 0.72, s, -s * 0.16);
+      ctx.lineTo(s * 0.78, 0);
+      ctx.lineTo(s, s * 0.16);
+      ctx.bezierCurveTo(s * 0.65, s * 0.72, -s * 0.4, s * 0.75, -s, 0);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function frame(now) {
+    const t = (now - startTime) * 0.001;
+
+    windForceX *= 0.94;
+    windForceY *= 0.94;
+
+    // 1. Deep Midnight Sky Background
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = '#020105';
+    ctx.fillRect(0, 0, width, height);
+
+    // 2. Ethereal Canopy Moonlight Aura (Bloom Layer)
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < glowOrbs.length; i++) {
+      const o = glowOrbs[i];
+      const pulse = 0.88 + 0.12 * Math.sin(t * 0.9 + o.phase);
+      const gx = o.x + Math.sin(t * 0.6 + o.phase) * 8;
+      const gy = o.y + Math.cos(t * 0.5 + o.phase) * 6;
+      const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, o.r);
+      grad.addColorStop(0, `rgba(216, 146, 255, ${o.alpha * pulse})`);
+      grad.addColorStop(0.5, `rgba(150, 82, 200, ${o.alpha * 0.45 * pulse})`);
+      grad.addColorStop(1, 'rgba(80, 30, 120, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(gx, gy, o.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 3. Delicate Night Branches & Wispy Twigs
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const breeze = Math.sin(t * 0.85) * 0.6 + Math.sin(t * 1.7) * 0.25;
+
+    for (let i = 0; i < branches.length; i++) {
+      const b = branches[i];
+      const pts = b.pts;
+      const swayStrength = (4.5 - b.depth) * 1.4;
+      const sx = (Math.sin(t * 0.9 + b.phase) + breeze * 0.6) * swayStrength + windForceX * 0.35;
+      const sy = Math.cos(t * 0.75 + b.phase) * swayStrength * 0.6 + windForceY * 0.25;
+
+      // Subtle moonlit violet-lavender twig silhouette
+      const lum = b.depth <= 1 ? 0.42 : 0.28;
+      ctx.strokeStyle = `rgba(175, 132, 198, ${lum})`;
+      ctx.lineWidth = Math.max(0.75 * dpr, b.thickness);
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let p = 1; p < pts.length; p++) {
+        const w = p / (pts.length - 1);
+        ctx.lineTo(pts[p].x + sx * w, pts[p].y + sy * w);
+      }
+      ctx.stroke();
+    }
+
+    // 4. Dense Layered 5-Petal Sakura Blossoms
+    for (let i = 0; i < blossoms.length; i++) {
+      const fl = blossoms[i];
+      const swayX = Math.sin(t * 0.95 + fl.phase) * fl.swayAmp + breeze * fl.swayAmp * 0.45;
+      const swayY = Math.cos(t * 0.78 + fl.phase * 1.1) * fl.swayAmp * 0.65;
+
+      let bx = fl.x + swayX;
+      let by = fl.y + swayY;
+
+      // Subtle interactive breeze ripple near pointer
+      const dx = bx - mouseX;
+      const dy = by - mouseY;
+      const dSq = dx * dx + dy * dy;
+      const mRad = 150 * dpr;
+      if (dSq < mRad * mRad && dSq > 1) {
+        const d = Math.sqrt(dSq);
+        const push = (1 - d / mRad) * 14 * dpr;
+        bx += (dx / d) * push + windForceX * 0.4;
+        by += (dy / d) * push + windForceY * 0.4;
+      }
+
+      const shimmer = 0.90 + 0.10 * Math.sin(t * fl.shimmerSpeed + fl.phase);
+      const sprite = blossomSprites[fl.spriteIdx];
+      const drawSize = fl.size * (0.97 + 0.03 * shimmer);
+
+      ctx.globalAlpha = fl.alpha * shimmer;
+      ctx.save();
+      ctx.translate(bx, by);
+      ctx.rotate(fl.rot + Math.sin(t * 0.65 + fl.phase) * 0.08);
+      ctx.drawImage(sprite, -drawSize * 0.5, -drawSize * 0.5, drawSize, drawSize);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1.0;
+
+    // 5. Drifting & Tumbling Loose Sakura Petals across the Night Sky
+    for (let i = 0; i < petals.length; i++) {
+      const p = petals[i];
+      const wobble = Math.sin(t * p.wobbleFreq + p.wobblePhase);
+
+      p.x += p.vx + wobble * 0.22 * dpr + windForceX * 0.04;
+      p.y += p.vy + Math.cos(t * p.wobbleFreq * 0.8 + p.wobblePhase) * 0.26 * dpr + windForceY * 0.04;
+      p.rot += p.rotSpeed + wobble * 0.01;
+      p.tumble += p.tumbleSpeed;
+
+      // Gentle swirl from mouse
+      const dx = p.x - mouseX;
+      const dy = p.y - mouseY;
+      const dSq = dx * dx + dy * dy;
+      const pRad = 120 * dpr;
+      if (dSq < pRad * pRad && dSq > 1) {
+        const d = Math.sqrt(dSq);
+        const f = (1 - d / pRad) * 1.4 * dpr;
+        p.x += (dx / d) * f + windForceX * 0.15;
+        p.y += (dy / d) * f + windForceY * 0.15;
+      }
+
+      drawPetal(p);
+
+      // Respawn when drifting off screen
+      if (p.x > width + 40 * dpr || p.y < -40 * dpr || p.y > height + 40 * dpr) {
+        petals[i] = spawnPetal(false);
+      }
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

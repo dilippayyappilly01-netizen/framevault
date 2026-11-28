@@ -1,16 +1,16 @@
-// Auto-generated FrameVault Component Catalog from designs/ folder (185 components across 5 sections)
+// Auto-generated FrameVault Component Catalog from designs/ folder (188 components across 5 sections)
 window.ORIGINKIT_SECTIONS = [
   {
     "id": "orbs",
     "name": "ORBS",
     "folderName": "orbs",
-    "count": 5
+    "count": 7
   },
   {
     "id": "assets",
     "name": "ASSETS",
     "folderName": "assets",
-    "count": 21
+    "count": 22
   },
   {
     "id": "carasols",
@@ -2602,6 +2602,870 @@ window.ORIGINKIT_COMPONENTS = [
             ]
           }
         ],
+        "stringParams": [],
+        "imageSlots": []
+      }
+    }
+  },
+  {
+    "id": "orbs__orb-7",
+    "section": "orbs",
+    "name": "orb 7",
+    "rawTitle": "Orb 07 — 3D Blue Fur Ribbon Sphere &amp; Yellow Honeycomb Core",
+    "displayTitle": "Orb 07 — 3D Blue Fur Ribbon Sphere &amp; Yellow Honeycomb Core",
+    "folderPath": "designs/orbs/orb 7/",
+    "htmlPath": "designs/orbs/orb 7/index.html",
+    "videoPath": "",
+    "engine": "WEBGL 3D",
+    "hasImages": false,
+    "hasBlueDefault": false,
+    "defaultBgColor": "#000000",
+    "htmlSource": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Orb 07 — 3D Blue Fur Ribbon Sphere &amp; Yellow Honeycomb Core</title>\n<style>\n  *, *::before, *::after {\n    box-sizing: border-box;\n    margin: 0;\n    padding: 0;\n  }\n\n  html, body {\n    width: 100%;\n    height: 100%;\n    overflow: hidden;\n    background: #000000;\n    user-select: none;\n    -webkit-font-smoothing: antialiased;\n  }\n\n  canvas {\n    display: block;\n    width: 100vw;\n    height: 100vh;\n    cursor: grab;\n  }\n\n  canvas:active {\n    cursor: grabbing;\n  }\n</style>\n</head>\n<body>\n<canvas id=\"glCanvas\"></canvas>\n\n<script>\n(() => {\n  const canvas = document.getElementById('glCanvas');\n  const gl = canvas.getContext('webgl2', { antialias: true, alpha: false }) ||\n             canvas.getContext('webgl', { antialias: true, alpha: false });\n  if (!gl) return;\n\n  // ---------------------------------------------------------------------------\n  // Shaders: Pass 1 — Inner Yellow Honeycomb Core Sphere\n  // ---------------------------------------------------------------------------\n  const vsCore = `\n    attribute vec3 aPos;\n    attribute vec3 aNormal;\n\n    uniform mat4 uProj;\n    uniform mat4 uView;\n    uniform mat3 uModelRot;\n    uniform float uScale;\n\n    varying vec3 vObjPos;\n    varying vec3 vWorldNormal;\n    varying vec3 vViewPos;\n\n    void main() {\n      vObjPos = aPos;\n      vec3 worldPos = uModelRot * (aPos * uScale);\n      vWorldNormal = normalize(uModelRot * aNormal);\n      vec4 viewPos = uView * vec4(worldPos, 1.0);\n      vViewPos = viewPos.xyz;\n      gl_Position = uProj * viewPos;\n    }\n  `;\n\n  const fsCore = `\n    precision highp float;\n\n    varying vec3 vObjPos;\n    varying vec3 vWorldNormal;\n    varying vec3 vViewPos;\n\n    uniform float uTime;\n\n    // Fast procedural hexagonal honeycomb grid on spherical coordinates\n    float hexDist(vec2 p) {\n      p = abs(p);\n      float c = dot(p, normalize(vec2(1.0, 1.7320508)));\n      return max(c, p.x);\n    }\n\n    vec4 hexCoords(vec2 uv) {\n      vec2 r = vec2(1.0, 1.7320508);\n      vec2 h = r * 0.5;\n      vec2 a = mod(uv, r) - h;\n      vec2 b = mod(uv - h, r) - h;\n      vec2 gv = dot(a, a) < dot(b, b) ? a : b;\n      float edge = 0.5 - hexDist(gv);\n      vec2 id = uv - gv;\n      return vec4(gv.x, gv.y, edge, fract(sin(dot(id, vec2(127.1, 311.7))) * 43758.5453));\n    }\n\n    // Helical ribbon mask matching the fur bands so core casts soft shadow under the bands\n    float bandField(vec3 p) {\n      float lat = asin(clamp(p.y, -1.0, 1.0));\n      float lon = atan(p.z, p.x);\n      float wave = sin(lat * 7.8 + lon * 1.0 + 0.35 * sin(lon * 2.0 + lat * 2.0));\n      return wave;\n    }\n\n    void main() {\n      vec3 p = normalize(vObjPos);\n      vec3 n = normalize(vWorldNormal);\n      vec3 v = normalize(-vViewPos);\n\n      // Spherical UV for fine hexagonal mesh\n      float lon = atan(p.z, p.x);\n      float lat = asin(clamp(p.y, -1.0, 1.0));\n      vec2 uv = vec2(lon * 11.5, lat * 11.5);\n      vec4 hc = hexCoords(uv);\n\n      // Raised cell center + crisp dark mesh groove\n      float cellBorder = smoothstep(0.02, 0.14, hc.z);\n      float cellDome = smoothstep(0.0, 0.42, hc.z);\n      float cellVar = 0.90 + 0.14 * hc.w;\n\n      // Studio lighting\n      vec3 keyLight  = normalize(vec3(-0.35, 0.55, 0.78));\n      vec3 fillLight = normalize(vec3(0.60, -0.25, 0.72));\n      vec3 rimLight  = normalize(vec3(0.0, 0.2, -0.95));\n\n      float diffKey  = max(0.0, dot(n, keyLight));\n      float diffFill = max(0.0, dot(n, fillLight));\n      float spec     = pow(max(0.0, dot(n, normalize(keyLight + v))), 26.0);\n      float fresnel  = pow(1.0 - max(0.0, dot(n, v)), 2.5);\n\n      // Ambient occlusion near the fur band borders\n      float bf = bandField(p);\n      float slitMask = smoothstep(-0.32, -0.66, bf); // 1 inside yellow slit, 0 under fur\n      float creviceAO = mix(0.18, 1.0, smoothstep(-0.15, -0.58, bf));\n\n      vec3 coreYellow = vec3(0.98, 0.89, 0.12);\n      vec3 coreAmber  = vec3(0.45, 0.36, 0.03);\n      vec3 coreGroove = vec3(0.16, 0.13, 0.01);\n\n      vec3 cellCol = mix(coreGroove, coreYellow * cellVar, cellBorder);\n      cellCol = mix(coreAmber, cellCol, 0.38 + 0.62 * diffKey + 0.22 * diffFill);\n      cellCol += vec3(1.0, 0.98, 0.68) * spec * cellDome * 0.45;\n      cellCol *= creviceAO;\n\n      // Darken deeply underneath fur bands so no yellow bleeds through thick fur roots\n      cellCol *= mix(0.06, 1.0, slitMask);\n      cellCol *= (1.0 - 0.35 * fresnel);\n\n      gl_FragColor = vec4(cellCol, 1.0);\n    }\n  `;\n\n  // ---------------------------------------------------------------------------\n  // Shaders: Pass 2 — 3D Curved Tapered Fur Strands\n  // ---------------------------------------------------------------------------\n  const vsFur = `\n    attribute vec3 aRoot;\n    attribute vec3 aFlow;\n    attribute vec3 aSide;\n    attribute vec4 aParam; // x: t (0..1), y: side (-1..1), z: length, w: seed\n\n    uniform mat4 uProj;\n    uniform mat4 uView;\n    uniform mat3 uModelRot;\n    uniform float uTime;\n    uniform vec2 uHoverWind;\n\n    varying float vT;\n    varying float vSeed;\n    varying vec3 vWorldNormal;\n    varying vec3 vWorldTangent;\n    varying vec3 vViewPos;\n\n    void main() {\n      float t = aParam.x;\n      float side = aParam.y;\n      float len = aParam.z;\n      float seed = aParam.w;\n\n      // Base spherical normal at root\n      vec3 rootNorm = normalize(aRoot);\n\n      // Gentle wind ripple along strand length\n      float phase = seed * 6.28318 + aRoot.x * 5.0 + aRoot.y * 4.0 + aRoot.z * 5.0;\n      float sway1 = sin(uTime * 2.2 + phase) * 0.032 * t * t;\n      float sway2 = cos(uTime * 1.65 - phase * 0.7) * 0.022 * t * t;\n\n      // Curve smoothly outward then tangentially along the helical ribbon flow\n      float lift = (0.36 * t + 0.14 * t * t) * len;\n      float sweep = (0.72 * t + 0.34 * t * t) * len;\n\n      vec3 strandPos = aRoot\n        + rootNorm * lift\n        + aFlow * sweep\n        + aSide * (sway1 + uHoverWind.x * 0.06 * t * t)\n        + rootNorm * (sway2 + uHoverWind.y * 0.04 * t * t);\n\n      // Taper ribbon width to a crisp needle tip\n      float halfWidth = (0.0115 + 0.005 * fract(seed * 17.3)) * (1.0 - t * 0.92);\n      vec3 posObj = strandPos + aSide * (side * halfWidth);\n\n      vec3 worldPos = uModelRot * posObj;\n      vWorldNormal = normalize(uModelRot * mix(rootNorm, aFlow, 0.25 * t));\n      vWorldTangent = normalize(uModelRot * normalize(aFlow * 0.85 + rootNorm * (0.45 - 0.3 * t)));\n\n      vec4 viewPos = uView * vec4(worldPos, 1.0);\n      vViewPos = viewPos.xyz;\n      vT = t;\n      vSeed = seed;\n\n      gl_Position = uProj * viewPos;\n    }\n  `;\n\n  const fsFur = `\n    precision highp float;\n\n    varying float vT;\n    varying float vSeed;\n    varying vec3 vWorldNormal;\n    varying vec3 vWorldTangent;\n    varying vec3 vViewPos;\n\n    void main() {\n      vec3 n = normalize(vWorldNormal);\n      vec3 tang = normalize(vWorldTangent);\n      vec3 v = normalize(-vViewPos);\n\n      vec3 keyLight  = normalize(vec3(-0.35, 0.58, 0.74));\n      vec3 fillLight = normalize(vec3(0.62, -0.18, 0.76));\n      vec3 rimLight  = normalize(vec3(0.05, 0.50, -0.86));\n\n      // Diffuse macro sphere lighting\n      float diffKey  = max(0.0, dot(n, keyLight));\n      float diffFill = max(0.0, dot(n, fillLight));\n\n      // Kajiya-Kay anisotropic hair highlight along strand tangent\n      vec3 hKey = normalize(keyLight + v);\n      float tdH = dot(tang, hKey);\n      float sinTH = sqrt(max(0.001, 1.0 - tdH * tdH));\n      float specHair = pow(sinTH, 18.0) * (0.35 + 0.65 * diffKey);\n\n      float rim = pow(1.0 - max(0.0, dot(n, v)), 2.2);\n\n      // Rich cobalt-blue fur palette with frost-white tipped guard hairs\n      vec3 furDeep  = vec3(0.02, 0.11, 0.34);\n      vec3 furRoyal = vec3(0.07, 0.36, 0.84);\n      vec3 furCyan  = vec3(0.24, 0.60, 0.98);\n      vec3 furTip   = vec3(0.90, 0.96, 1.00);\n\n      // Root-to-tip ambient occlusion & color progression\n      float rootAO = smoothstep(0.0, 0.42, vT);\n      float shadeVar = fract(vSeed * 31.7);\n      vec3 baseCol = mix(furDeep, furRoyal, rootAO * (0.65 + 0.35 * shadeVar));\n      baseCol = mix(baseCol, furCyan, smoothstep(0.45, 0.95, vT) * (0.45 + 0.55 * diffKey));\n\n      // Guard hairs with crisp silvery-white tips (matching the frosty streaks in Orb 7)\n      float isFrostTip = step(0.66, fract(vSeed * 13.37));\n      float frostAmount = isFrostTip * smoothstep(0.48, 0.96, vT);\n      baseCol = mix(baseCol, furTip, frostAmount * 0.90);\n\n      // Combine lighting\n      float lightFactor = 0.28 + 0.78 * diffKey + 0.30 * diffFill;\n      vec3 col = baseCol * lightFactor;\n      col += mix(furCyan, furTip, 0.65) * specHair * 0.52 * smoothstep(0.15, 0.85, vT);\n      col += vec3(0.28, 0.58, 1.0) * rim * 0.32 * vT;\n\n      gl_FragColor = vec4(col, 1.0);\n    }\n  `;\n\n  // ---------------------------------------------------------------------------\n  // WebGL Helpers\n  // ---------------------------------------------------------------------------\n  function compile(type, src) {\n    const sh = gl.createShader(type);\n    gl.shaderSource(sh, src);\n    gl.compileShader(sh);\n    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {\n      console.error(gl.getShaderInfoLog(sh));\n    }\n    return sh;\n  }\n\n  function link(vs, fs) {\n    const p = gl.createProgram();\n    gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));\n    gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));\n    gl.linkProgram(p);\n    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {\n      console.error(gl.getProgramInfoLog(p));\n    }\n    return p;\n  }\n\n  const coreProg = link(vsCore, fsCore);\n  const furProg  = link(vsFur, fsFur);\n\n  // ---------------------------------------------------------------------------\n  // Geometry 1: High-res UV Sphere for Yellow Honeycomb Core\n  // ---------------------------------------------------------------------------\n  function buildSphere(latSegs, lonSegs) {\n    const pos = [];\n    const norm = [];\n    const idx = [];\n\n    for (let y = 0; y <= latSegs; y++) {\n      const v = y / latSegs;\n      const theta = v * Math.PI;\n      const sinT = Math.sin(theta);\n      const cosT = Math.cos(theta);\n      for (let x = 0; x <= lonSegs; x++) {\n        const u = x / lonSegs;\n        const phi = u * Math.PI * 2;\n        const nx = sinT * Math.cos(phi);\n        const ny = cosT;\n        const nz = sinT * Math.sin(phi);\n        pos.push(nx, ny, nz);\n        norm.push(nx, ny, nz);\n      }\n    }\n\n    for (let y = 0; y < latSegs; y++) {\n      for (let x = 0; x < lonSegs; x++) {\n        const a = y * (lonSegs + 1) + x;\n        const b = a + lonSegs + 1;\n        idx.push(a, b, a + 1);\n        idx.push(b, b + 1, a + 1);\n      }\n    }\n\n    return {\n      pos: new Float32Array(pos),\n      norm: new Float32Array(norm),\n      idx: new Uint16Array(idx),\n      count: idx.length\n    };\n  }\n\n  const coreMesh = buildSphere(56, 84);\n  const corePosBuf = gl.createBuffer();\n  gl.bindBuffer(gl.ARRAY_BUFFER, corePosBuf);\n  gl.bufferData(gl.ARRAY_BUFFER, coreMesh.pos, gl.STATIC_DRAW);\n\n  const coreNormBuf = gl.createBuffer();\n  gl.bindBuffer(gl.ARRAY_BUFFER, coreNormBuf);\n  gl.bufferData(gl.ARRAY_BUFFER, coreMesh.norm, gl.STATIC_DRAW);\n\n  const coreIdxBuf = gl.createBuffer();\n  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, coreIdxBuf);\n  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, coreMesh.idx, gl.STATIC_DRAW);\n\n  // ---------------------------------------------------------------------------\n  // Geometry 2: Helical Blue Fur Ribbons (13,500 3D curved strands)\n  // ---------------------------------------------------------------------------\n  function bandFieldJS(x, y, z) {\n    const lat = Math.asin(Math.max(-1, Math.min(1, y)));\n    const lon = Math.atan2(z, x);\n    return Math.sin(lat * 7.8 + lon * 1.0 + 0.35 * Math.sin(lon * 2.0 + lat * 2.0));\n  }\n\n  function buildFurGeometry() {\n    const TARGET_STRANDS = 13500;\n    const VERTS_PER_STRAND = 15; // 2 quads (12 verts) + 1 tip triangle (3 verts)\n    const STRIDE = 13; // root(3) + flow(3) + side(3) + param(4)\n    const data = new Float32Array(TARGET_STRANDS * VERTS_PER_STRAND * STRIDE);\n\n    // Deterministic pseudo-random generator\n    let rng = 918273;\n    const rand = () => {\n      rng = (rng * 1664525 + 1013904223) >>> 0;\n      return rng / 4294967296;\n    };\n\n    const coreRadius = 0.855;\n    let placed = 0;\n    let offset = 0;\n    let attempts = 0;\n\n    while (placed < TARGET_STRANDS && attempts < TARGET_STRANDS * 8) {\n      attempts++;\n      // Uniform random point on sphere\n      const u = rand() * 2 - 1;\n      const phi = rand() * Math.PI * 2;\n      const s = Math.sqrt(Math.max(0, 1 - u * u));\n      const nx = s * Math.cos(phi);\n      const ny = u;\n      const nz = s * Math.sin(phi);\n\n      const bf = bandFieldJS(nx, ny, nz);\n      // Leave clean helical slits open so the yellow honeycomb core gleams through\n      if (bf < -0.28) continue;\n\n      // Feather density slightly near band edges\n      const edgeWeight = Math.min(1, (bf + 0.28) / 0.35);\n      if (rand() > 0.35 + 0.65 * edgeWeight) continue;\n\n      const rx = nx * coreRadius;\n      const ry = ny * coreRadius;\n      const rz = nz * coreRadius;\n\n      // Tangential flow direction wrapping around the helical bands\n      let tx = -nz;\n      let ty = 0.16 * Math.cos(phi * 2.0) + 0.12;\n      let tz = nx;\n\n      // Project tangent orthogonal to sphere normal\n      const dotTN = tx * nx + ty * ny + tz * nz;\n      tx -= dotTN * nx;\n      ty -= dotTN * ny;\n      tz -= dotTN * nz;\n      let tLen = Math.hypot(tx, ty, tz) || 1;\n      tx /= tLen; ty /= tLen; tz /= tLen;\n\n      // Bitangent (side vector)\n      let bx = ny * tz - nz * ty;\n      let by = nz * tx - nx * tz;\n      let bz = nx * ty - ny * tx;\n      let bLen = Math.hypot(bx, by, bz) || 1;\n      bx /= bLen; by /= bLen; bz /= bLen;\n\n      // Add organic clumping & directional ruffle\n      const clumpAng = (rand() - 0.5) * 0.75 + 0.28 * Math.sin(ny * 14.0 + phi * 5.0);\n      const ca = Math.cos(clumpAng);\n      const sa = Math.sin(clumpAng);\n      const fx = tx * ca + bx * sa;\n      const fy = ty * ca + by * sa;\n      const fz = tz * ca + bz * sa;\n\n      const sx = -tx * sa + bx * ca;\n      const sy = -ty * sa + by * ca;\n      const sz = -tz * sa + bz * ca;\n\n      const strandLen = (0.145 + 0.115 * rand()) * (0.72 + 0.28 * edgeWeight);\n      const seed = rand();\n\n      const pushVert = (tVal, sideVal) => {\n        data[offset++] = rx;\n        data[offset++] = ry;\n        data[offset++] = rz;\n        data[offset++] = fx;\n        data[offset++] = fy;\n        data[offset++] = fz;\n        data[offset++] = sx;\n        data[offset++] = sy;\n        data[offset++] = sz;\n        data[offset++] = tVal;\n        data[offset++] = sideVal;\n        data[offset++] = strandLen;\n        data[offset++] = seed;\n      };\n\n      // Segment 0: t = 0.0 -> 0.36\n      pushVert(0.00, -1); pushVert(0.00,  1); pushVert(0.36, -1);\n      pushVert(0.36, -1); pushVert(0.00,  1); pushVert(0.36,  1);\n      // Segment 1: t = 0.36 -> 0.72\n      pushVert(0.36, -1); pushVert(0.36,  1); pushVert(0.72, -1);\n      pushVert(0.72, -1); pushVert(0.36,  1); pushVert(0.72,  1);\n      // Segment 2: tapered tip t = 0.72 -> 1.0\n      pushVert(0.72, -1); pushVert(0.72,  1); pushVert(1.00,  0);\n\n      placed++;\n    }\n\n    return {\n      data: data.subarray(0, placed * VERTS_PER_STRAND * STRIDE),\n      vertCount: placed * VERTS_PER_STRAND,\n      strideBytes: STRIDE * 4\n    };\n  }\n\n  const furGeo = buildFurGeometry();\n  const furBuf = gl.createBuffer();\n  gl.bindBuffer(gl.ARRAY_BUFFER, furBuf);\n  gl.bufferData(gl.ARRAY_BUFFER, furGeo.data, gl.STATIC_DRAW);\n\n  // ---------------------------------------------------------------------------\n  // Matrix Math\n  // ---------------------------------------------------------------------------\n  function perspective(fovRad, aspect, near, far) {\n    const f = 1.0 / Math.tan(fovRad * 0.5);\n    const nf = 1 / (near - far);\n    return new Float32Array([\n      f / aspect, 0, 0, 0,\n      0, f, 0, 0,\n      0, 0, (far + near) * nf, -1,\n      0, 0, 2 * far * near * nf, 0\n    ]);\n  }\n\n  function rotationMat3(rx, ry, rz) {\n    const cx = Math.cos(rx), sx = Math.sin(rx);\n    const cy = Math.cos(ry), sy = Math.sin(ry);\n    const cz = Math.cos(rz), sz = Math.sin(rz);\n\n    // Rz * Rx * Ry\n    const m00 = cz * cy - sz * sx * sy;\n    const m01 = -sz * cx;\n    const m02 = cz * sy + sz * sx * cy;\n\n    const m10 = sz * cy + cz * sx * sy;\n    const m11 = cz * cx;\n    const m12 = sz * sy - cz * sx * cy;\n\n    const m20 = -cx * sy;\n    const m21 = sx;\n    const m22 = cx * cy;\n\n    return new Float32Array([\n      m00, m10, m20,\n      m01, m11, m21,\n      m02, m12, m22\n    ]);\n  }\n\n  const viewMat = new Float32Array([\n    1, 0, 0, 0,\n    0, 1, 0, 0,\n    0, 0, 1, 0,\n    0, 0, -3.15, 1\n  ]);\n\n  // ---------------------------------------------------------------------------\n  // Interaction (Drag to Orbit + Hover Breeze)\n  // ---------------------------------------------------------------------------\n  let isDragging = false;\n  let lastX = 0, lastY = 0;\n  let rotX = 0.20, rotY = 0.0;\n  let velX = 0, velY = 0;\n  let hoverTargetX = 0, hoverTargetY = 0;\n  let hoverX = 0, hoverY = 0;\n\n  canvas.addEventListener('pointerdown', e => {\n    isDragging = true;\n    lastX = e.clientX;\n    lastY = e.clientY;\n    canvas.setPointerCapture(e.pointerId);\n  });\n\n  window.addEventListener('pointermove', e => {\n    const nx = (e.clientX / Math.max(1, window.innerWidth)) * 2 - 1;\n    const ny = -((e.clientY / Math.max(1, window.innerHeight)) * 2 - 1);\n    hoverTargetX = nx;\n    hoverTargetY = ny;\n\n    if (!isDragging) return;\n    const dx = e.clientX - lastX;\n    const dy = e.clientY - lastY;\n    lastX = e.clientX;\n    lastY = e.clientY;\n    velY = dx * 0.008;\n    velX = dy * 0.008;\n    rotY += velY;\n    rotX += velX;\n  });\n\n  window.addEventListener('pointerup', () => {\n    isDragging = false;\n  });\n\n  // ---------------------------------------------------------------------------\n  // Resize & Render Loop\n  // ---------------------------------------------------------------------------\n  let projMat = perspective(Math.PI / 4.2, 1, 0.1, 20);\n\n  function resize() {\n    const dpr = Math.min(window.devicePixelRatio || 1, 2);\n    const w = Math.max(1, Math.floor(window.innerWidth * dpr));\n    const h = Math.max(1, Math.floor(window.innerHeight * dpr));\n    if (canvas.width !== w || canvas.height !== h) {\n      canvas.width = w;\n      canvas.height = h;\n    }\n    gl.viewport(0, 0, w, h);\n    projMat = perspective(Math.PI / 4.2, w / h, 0.1, 20);\n  }\n\n  window.addEventListener('resize', resize);\n  resize();\n\n  gl.enable(gl.DEPTH_TEST);\n  gl.depthFunc(gl.LEQUAL);\n  gl.clearColor(0.0, 0.0, 0.0, 1.0);\n\n  // Attribute & Uniform locations\n  const cLoc = {\n    aPos: gl.getAttribLocation(coreProg, 'aPos'),\n    aNormal: gl.getAttribLocation(coreProg, 'aNormal'),\n    uProj: gl.getUniformLocation(coreProg, 'uProj'),\n    uView: gl.getUniformLocation(coreProg, 'uView'),\n    uModelRot: gl.getUniformLocation(coreProg, 'uModelRot'),\n    uScale: gl.getUniformLocation(coreProg, 'uScale'),\n    uTime: gl.getUniformLocation(coreProg, 'uTime')\n  };\n\n  const fLoc = {\n    aRoot: gl.getAttribLocation(furProg, 'aRoot'),\n    aFlow: gl.getAttribLocation(furProg, 'aFlow'),\n    aSide: gl.getAttribLocation(furProg, 'aSide'),\n    aParam: gl.getAttribLocation(furProg, 'aParam'),\n    uProj: gl.getUniformLocation(furProg, 'uProj'),\n    uView: gl.getUniformLocation(furProg, 'uView'),\n    uModelRot: gl.getUniformLocation(furProg, 'uModelRot'),\n    uTime: gl.getUniformLocation(furProg, 'uTime'),\n    uHoverWind: gl.getUniformLocation(furProg, 'uHoverWind')\n  };\n\n  let startTime = performance.now();\n\n  function frame(now) {\n    const t = (now - startTime) * 0.001;\n\n    if (!isDragging) {\n      rotY += 0.0065 + velY;\n      rotX += velX;\n      velX *= 0.92;\n      velY *= 0.92;\n      rotX += (0.20 - rotX) * 0.015;\n    }\n\n    hoverX += (hoverTargetX - hoverX) * 0.06;\n    hoverY += (hoverTargetY - hoverY) * 0.06;\n\n    const modelRot = rotationMat3(rotX, rotY, -0.22);\n\n    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);\n\n    // 1. Draw Inner Yellow Honeycomb Core\n    gl.useProgram(coreProg);\n    gl.uniformMatrix4fv(cLoc.uProj, false, projMat);\n    gl.uniformMatrix4fv(cLoc.uView, false, viewMat);\n    gl.uniformMatrix3fv(cLoc.uModelRot, false, modelRot);\n    gl.uniform1f(cLoc.uScale, 0.855);\n    gl.uniform1f(cLoc.uTime, t);\n\n    gl.bindBuffer(gl.ARRAY_BUFFER, corePosBuf);\n    gl.enableVertexAttribArray(cLoc.aPos);\n    gl.vertexAttribPointer(cLoc.aPos, 3, gl.FLOAT, false, 0, 0);\n\n    gl.bindBuffer(gl.ARRAY_BUFFER, coreNormBuf);\n    gl.enableVertexAttribArray(cLoc.aNormal);\n    gl.vertexAttribPointer(cLoc.aNormal, 3, gl.FLOAT, false, 0, 0);\n\n    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, coreIdxBuf);\n    gl.drawElements(gl.TRIANGLES, coreMesh.count, gl.UNSIGNED_SHORT, 0);\n\n    gl.disableVertexAttribArray(cLoc.aPos);\n    gl.disableVertexAttribArray(cLoc.aNormal);\n\n    // 2. Draw 3D Blue Fur Strands\n    gl.useProgram(furProg);\n    gl.uniformMatrix4fv(fLoc.uProj, false, projMat);\n    gl.uniformMatrix4fv(fLoc.uView, false, viewMat);\n    gl.uniformMatrix3fv(fLoc.uModelRot, false, modelRot);\n    gl.uniform1f(fLoc.uTime, t);\n    gl.uniform2f(fLoc.uHoverWind, hoverX, hoverY);\n\n    gl.bindBuffer(gl.ARRAY_BUFFER, furBuf);\n    gl.enableVertexAttribArray(fLoc.aRoot);\n    gl.vertexAttribPointer(fLoc.aRoot, 3, gl.FLOAT, false, furGeo.strideBytes, 0);\n    gl.enableVertexAttribArray(fLoc.aFlow);\n    gl.vertexAttribPointer(fLoc.aFlow, 3, gl.FLOAT, false, furGeo.strideBytes, 12);\n    gl.enableVertexAttribArray(fLoc.aSide);\n    gl.vertexAttribPointer(fLoc.aSide, 3, gl.FLOAT, false, furGeo.strideBytes, 24);\n    gl.enableVertexAttribArray(fLoc.aParam);\n    gl.vertexAttribPointer(fLoc.aParam, 4, gl.FLOAT, false, furGeo.strideBytes, 36);\n\n    gl.drawArrays(gl.TRIANGLES, 0, furGeo.vertCount);\n\n    gl.disableVertexAttribArray(fLoc.aRoot);\n    gl.disableVertexAttribArray(fLoc.aFlow);\n    gl.disableVertexAttribArray(fLoc.aSide);\n    gl.disableVertexAttribArray(fLoc.aParam);\n\n    requestAnimationFrame(frame);\n  }\n\n  requestAnimationFrame(frame);\n})();\n</script>\n</body>\n</html>\n",
+    "controlParameterSet": {
+      "speeds": {
+        "animationSpeed": {
+          "label": "MASTER ANIMATION SPEED",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0,
+          "max": 4,
+          "step": 0.05,
+          "unit": "x"
+        },
+        "autoPlay": {
+          "label": "AUTO-PLAY / CONTINUOUS MOTION",
+          "value": true,
+          "defaultValue": true,
+          "type": "toggle"
+        },
+        "reverseDirection": {
+          "label": "REVERSE MOTION DIRECTION",
+          "value": false,
+          "defaultValue": false,
+          "type": "toggle"
+        },
+        "autoDrive": {
+          "label": "AUTO-ORBIT / AUTO-SCROLL DRIVE",
+          "value": false,
+          "defaultValue": false,
+          "type": "toggle"
+        },
+        "dragSensitivity": {
+          "label": "POINTER DRAG SENSITIVITY",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0.2,
+          "max": 3,
+          "step": 0.1,
+          "unit": "x"
+        },
+        "motionSmoothing": {
+          "label": "INERTIA / DAMPING FACTOR",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0.2,
+          "max": 3,
+          "step": 0.1,
+          "unit": "x"
+        },
+        "componentSpeeds": []
+      },
+      "effects": {
+        "scale": {
+          "label": "STAGE SCALE / ZOOM",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0.4,
+          "max": 2.2,
+          "step": 0.05,
+          "unit": "x"
+        },
+        "perspective": {
+          "label": "3D PERSPECTIVE DEPTH",
+          "value": 900,
+          "defaultValue": 900,
+          "min": 200,
+          "max": 2400,
+          "step": 25,
+          "unit": "px"
+        },
+        "tiltX": {
+          "label": "3D STAGE TILT X",
+          "value": 0,
+          "defaultValue": 0,
+          "min": -45,
+          "max": 45,
+          "step": 1,
+          "unit": "deg"
+        },
+        "tiltY": {
+          "label": "3D STAGE TILT Y",
+          "value": 0,
+          "defaultValue": 0,
+          "min": -45,
+          "max": 45,
+          "step": 1,
+          "unit": "deg"
+        },
+        "rotateZ": {
+          "label": "STAGE ROTATION Z",
+          "value": 0,
+          "defaultValue": 0,
+          "min": -180,
+          "max": 180,
+          "step": 1,
+          "unit": "deg"
+        },
+        "blur": {
+          "label": "OPTICAL GAUSSIAN BLUR",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 20,
+          "step": 0.5,
+          "unit": "px"
+        },
+        "glowIntensity": {
+          "label": "BLOOM / DROP-GLOW STRENGTH",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 60,
+          "step": 1,
+          "unit": "px"
+        },
+        "glowColor": {
+          "label": "BLOOM GLOW COLOUR",
+          "value": "#ff5500",
+          "defaultValue": "#ff5500",
+          "type": "color"
+        },
+        "liquidDistortion": {
+          "label": "LIQUID SVG TURBULENCE WARP",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 80,
+          "step": 1,
+          "unit": ""
+        },
+        "liquidFrequency": {
+          "label": "TURBULENCE WAVE FREQUENCY",
+          "value": 0.015,
+          "defaultValue": 0.015,
+          "min": 0.002,
+          "max": 0.06,
+          "step": 0.002,
+          "unit": ""
+        },
+        "vignette": {
+          "label": "STUDIO RADIAL VIGNETTE",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 90,
+          "step": 2,
+          "unit": "%"
+        },
+        "componentEffects": []
+      },
+      "colours": {
+        "backgroundColor": {
+          "label": "STAGE BACKGROUND COLOUR",
+          "value": "#000000",
+          "defaultValue": "#000000",
+          "type": "color"
+        },
+        "hueRotate": {
+          "label": "HUE SHIFT ANGLE",
+          "value": 0,
+          "defaultValue": 0,
+          "min": -180,
+          "max": 180,
+          "step": 1,
+          "unit": "deg"
+        },
+        "saturate": {
+          "label": "COLOUR SATURATION",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 0,
+          "max": 300,
+          "step": 5,
+          "unit": "%"
+        },
+        "brightness": {
+          "label": "EXPOSURE BRIGHTNESS",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 40,
+          "max": 220,
+          "step": 5,
+          "unit": "%"
+        },
+        "contrast": {
+          "label": "TONAL CONTRAST",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 40,
+          "max": 220,
+          "step": 5,
+          "unit": "%"
+        },
+        "invert": {
+          "label": "INVERT / NEGATIVE",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "unit": "%"
+        },
+        "sepia": {
+          "label": "WARM SEPIA FILTER",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "unit": "%"
+        },
+        "tintColor": {
+          "label": "OVERLAY TINT COLOUR",
+          "value": "#ff5500",
+          "defaultValue": "#ff5500",
+          "type": "color"
+        },
+        "tintOpacity": {
+          "label": "OVERLAY TINT OPACITY",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 85,
+          "step": 5,
+          "unit": "%"
+        },
+        "hexColorParams": [
+          {
+            "key": "hex_1",
+            "label": "PRIMARY SURFACE HEX",
+            "value": "#000000",
+            "defaultValue": "#000000",
+            "rawHex": "#000000"
+          }
+        ],
+        "shaderColorParams": [
+          {
+            "key": "vec3_coreYellow",
+            "varName": "coreYellow",
+            "label": "SHADER CORE YELLOW",
+            "value": "#fae31f",
+            "defaultValue": "#fae31f",
+            "rawMatch": "vec3 coreYellow = vec3(0.98, 0.89, 0.12)"
+          },
+          {
+            "key": "vec3_coreAmber",
+            "varName": "coreAmber",
+            "label": "SHADER CORE AMBER",
+            "value": "#735c08",
+            "defaultValue": "#735c08",
+            "rawMatch": "vec3 coreAmber  = vec3(0.45, 0.36, 0.03)"
+          },
+          {
+            "key": "vec3_coreGroove",
+            "varName": "coreGroove",
+            "label": "SHADER CORE GROOVE",
+            "value": "#292103",
+            "defaultValue": "#292103",
+            "rawMatch": "vec3 coreGroove = vec3(0.16, 0.13, 0.01)"
+          },
+          {
+            "key": "vec3_furDeep",
+            "varName": "furDeep",
+            "label": "SHADER FUR DEEP",
+            "value": "#051c57",
+            "defaultValue": "#051c57",
+            "rawMatch": "vec3 furDeep  = vec3(0.02, 0.11, 0.34)"
+          },
+          {
+            "key": "vec3_furRoyal",
+            "varName": "furRoyal",
+            "label": "SHADER FUR ROYAL",
+            "value": "#125cd6",
+            "defaultValue": "#125cd6",
+            "rawMatch": "vec3 furRoyal = vec3(0.07, 0.36, 0.84)"
+          },
+          {
+            "key": "vec3_furCyan",
+            "varName": "furCyan",
+            "label": "SHADER FUR CYAN",
+            "value": "#3d99fa",
+            "defaultValue": "#3d99fa",
+            "rawMatch": "vec3 furCyan  = vec3(0.24, 0.60, 0.98)"
+          },
+          {
+            "key": "vec3_furTip",
+            "varName": "furTip",
+            "label": "SHADER FUR TIP",
+            "value": "#e6f5ff",
+            "defaultValue": "#e6f5ff",
+            "rawMatch": "vec3 furTip   = vec3(0.90, 0.96, 1.00)"
+          }
+        ]
+      },
+      "htmlProperties": {
+        "documentTitle": {
+          "label": "HTML <TITLE> PROPERTY",
+          "value": "Orb 07 — 3D Blue Fur Ribbon Sphere &amp; Yellow Honeycomb Core",
+          "defaultValue": "Orb 07 — 3D Blue Fur Ribbon Sphere &amp; Yellow Honeycomb Core",
+          "type": "text"
+        },
+        "bodyId": {
+          "label": "BODY [ID] ATTRIBUTE",
+          "value": "orbs-orb-7",
+          "defaultValue": "orbs-orb-7",
+          "type": "text"
+        },
+        "bodyClass": {
+          "label": "BODY [CLASS] ATTRIBUTE",
+          "value": "",
+          "defaultValue": "",
+          "type": "text"
+        },
+        "bodyDir": {
+          "label": "HTML [DIR] DIRECTION",
+          "value": "ltr",
+          "defaultValue": "ltr",
+          "options": [
+            "ltr",
+            "rtl"
+          ]
+        },
+        "dataTheme": {
+          "label": "BODY [DATA-THEME] ATTRIBUTE",
+          "value": "dark-carbon",
+          "defaultValue": "dark-carbon",
+          "type": "text"
+        },
+        "fontFamily": {
+          "label": "COMPONENT FONT-FAMILY",
+          "value": "Inter, system-ui, sans-serif",
+          "defaultValue": "Inter, system-ui, sans-serif",
+          "options": [
+            "Inter, system-ui, sans-serif",
+            "monospace",
+            "sans-serif"
+          ]
+        },
+        "cursor": {
+          "label": "STAGE [STYLE.CURSOR]",
+          "value": "grab",
+          "defaultValue": "grab",
+          "options": [
+            "default",
+            "grab",
+            "pointer",
+            "crosshair",
+            "none"
+          ]
+        },
+        "overflow": {
+          "label": "BODY [STYLE.OVERFLOW]",
+          "value": "hidden",
+          "defaultValue": "hidden",
+          "options": [
+            "hidden",
+            "visible",
+            "auto"
+          ]
+        },
+        "opacity": {
+          "label": "BODY [STYLE.OPACITY]",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0.1,
+          "max": 1,
+          "step": 0.05
+        },
+        "padding": {
+          "label": "BODY [STYLE.PADDING]",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 64,
+          "step": 2,
+          "unit": "px"
+        },
+        "borderRadius": {
+          "label": "STAGE [STYLE.BORDER-RADIUS]",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 80,
+          "step": 2,
+          "unit": "px"
+        },
+        "borderWidth": {
+          "label": "STAGE [STYLE.BORDER-WIDTH]",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 16,
+          "step": 1,
+          "unit": "px"
+        },
+        "borderColor": {
+          "label": "STAGE [STYLE.BORDER-COLOR]",
+          "value": "#ff5500",
+          "defaultValue": "#ff5500",
+          "type": "color"
+        },
+        "stageWidth": {
+          "label": "STAGE [STYLE.WIDTH]",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 30,
+          "max": 100,
+          "step": 2,
+          "unit": "%"
+        },
+        "stageHeight": {
+          "label": "STAGE [STYLE.HEIGHT]",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 30,
+          "max": 100,
+          "step": 2,
+          "unit": "%"
+        },
+        "mixBlendMode": {
+          "label": "STAGE [STYLE.MIX-BLEND-MODE]",
+          "value": "normal",
+          "defaultValue": "normal",
+          "options": [
+            "normal",
+            "screen",
+            "lighten",
+            "multiply",
+            "difference",
+            "exclusion",
+            "overlay"
+          ]
+        },
+        "domElements": [],
+        "cssRuleParams": [],
+        "stringParams": [],
+        "imageSlots": []
+      }
+    }
+  },
+  {
+    "id": "orbs__orb-8",
+    "section": "orbs",
+    "name": "orb 8",
+    "rawTitle": "Orb 08 — Interactive Fibonacci Particle Sphere with Fluid Repulsion Wake",
+    "displayTitle": "Orb 08 — Interactive Fibonacci Particle Sphere with Fluid Repulsion Wake",
+    "folderPath": "designs/orbs/orb 8/",
+    "htmlPath": "designs/orbs/orb 8/index.html",
+    "videoPath": "",
+    "engine": "WEBGL 3D",
+    "hasImages": false,
+    "hasBlueDefault": false,
+    "defaultBgColor": "#000000",
+    "htmlSource": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Orb 08 — Interactive Fibonacci Particle Sphere with Fluid Repulsion Wake</title>\n<style>\n  *, *::before, *::after {\n    box-sizing: border-box;\n    margin: 0;\n    padding: 0;\n  }\n\n  html, body {\n    width: 100%;\n    height: 100%;\n    overflow: hidden;\n    background: #000000;\n    user-select: none;\n    -webkit-font-smoothing: antialiased;\n  }\n\n  canvas {\n    display: block;\n    width: 100vw;\n    height: 100vh;\n    cursor: crosshair;\n  }\n</style>\n</head>\n<body>\n<canvas id=\"glCanvas\"></canvas>\n\n<script>\n(() => {\n  const canvas = document.getElementById('glCanvas');\n  const gl = canvas.getContext('webgl2', { antialias: true, alpha: false }) ||\n             canvas.getContext('webgl', { antialias: true, alpha: false });\n  if (!gl) return;\n\n  // ---------------------------------------------------------------------------\n  // Shaders: Crisp Depth-Shaded Particles with Coral-Pink Displacement Rim\n  // ---------------------------------------------------------------------------\n  const vsSource = `\n    attribute vec3 aPos;\n    attribute float aDisp;\n\n    uniform vec2 uResolution;\n    uniform float uScale;\n    uniform float uDpr;\n\n    varying float vDepth;\n    varying float vDisp;\n\n    void main() {\n      float fov = 3.2;\n      float persp = fov / (fov - aPos.z * 0.72);\n      float aspect = uResolution.x / max(uResolution.y, 1.0);\n\n      float x = (aPos.x * uScale * persp) / aspect;\n      float y = aPos.y * uScale * persp;\n\n      gl_Position = vec4(x, y, -aPos.z * 0.25, 1.0);\n\n      float frontness = clamp((aPos.z + 1.0) * 0.5, 0.0, 1.0);\n      vDepth = frontness;\n      vDisp = aDisp;\n\n      float baseSize = mix(1.55, 3.05, pow(frontness, 1.15));\n      float rimBoost = 1.0 + clamp(aDisp * 2.2, 0.0, 0.55);\n      gl_PointSize = baseSize * rimBoost * persp * uDpr;\n    }\n  `;\n\n  const fsSource = `\n    precision highp float;\n\n    varying float vDepth;\n    varying float vDisp;\n\n    void main() {\n      vec2 p = gl_PointCoord - 0.5;\n      float d = length(p);\n      if (d > 0.5) discard;\n\n      // Crisp circular dot with subtle anti-aliased edge\n      float alpha = smoothstep(0.50, 0.22, d);\n\n      // Depth attenuation so front hemisphere dots pop brightly over back dots\n      float depthShade = mix(0.20, 1.0, pow(vDepth, 1.25));\n\n      vec3 dotWhite  = vec3(0.98, 0.99, 1.00);\n      vec3 wakeCoral = vec3(1.00, 0.42, 0.48);\n\n      // Subtle rose-pink/coral tint along the displaced cavity rim\n      float rimFactor = smoothstep(0.035, 0.22, vDisp) * smoothstep(0.05, 0.55, vDepth);\n      vec3 col = mix(dotWhite, wakeCoral, clamp(rimFactor * 0.88, 0.0, 0.92));\n\n      gl_FragColor = vec4(col * depthShade, alpha * mix(0.45, 1.0, vDepth));\n    }\n  `;\n\n  function compile(type, src) {\n    const sh = gl.createShader(type);\n    gl.shaderSource(sh, src);\n    gl.compileShader(sh);\n    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {\n      console.error(gl.getShaderInfoLog(sh));\n    }\n    return sh;\n  }\n\n  const prog = gl.createProgram();\n  gl.attachShader(prog, compile(gl.VERTEX_SHADER, vsSource));\n  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, fsSource));\n  gl.linkProgram(prog);\n  gl.useProgram(prog);\n\n  // ---------------------------------------------------------------------------\n  // Fibonacci Sphere Lattice (7,200 crisp regularly spaced particles)\n  // ---------------------------------------------------------------------------\n  const COUNT = 7200;\n  const homeX = new Float32Array(COUNT);\n  const homeY = new Float32Array(COUNT);\n  const homeZ = new Float32Array(COUNT);\n\n  // Displaced offsets in view/world space\n  const offX = new Float32Array(COUNT);\n  const offY = new Float32Array(COUNT);\n  const offZ = new Float32Array(COUNT);\n  const velX = new Float32Array(COUNT);\n  const velY = new Float32Array(COUNT);\n  const velZ = new Float32Array(COUNT);\n\n  // Interleaved GPU vertex buffer: [x, y, z, disp]\n  const vboData = new Float32Array(COUNT * 4);\n\n  const goldenAngle = Math.PI * (3 - Math.sqrt(5));\n  for (let i = 0; i < COUNT; i++) {\n    const y = 1 - (i / (COUNT - 1)) * 2;\n    const r = Math.sqrt(Math.max(0, 1 - y * y));\n    const theta = goldenAngle * i;\n    homeX[i] = Math.cos(theta) * r;\n    homeY[i] = y;\n    homeZ[i] = Math.sin(theta) * r;\n  }\n\n  const vbo = gl.createBuffer();\n  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);\n  gl.bufferData(gl.ARRAY_BUFFER, vboData.byteLength, gl.DYNAMIC_DRAW);\n\n  const aPosLoc  = gl.getAttribLocation(prog, 'aPos');\n  const aDispLoc = gl.getAttribLocation(prog, 'aDisp');\n  const uResLoc  = gl.getUniformLocation(prog, 'uResolution');\n  const uScaleLoc = gl.getUniformLocation(prog, 'uScale');\n  const uDprLoc  = gl.getUniformLocation(prog, 'uDpr');\n\n  gl.enableVertexAttribArray(aPosLoc);\n  gl.vertexAttribPointer(aPosLoc, 3, gl.FLOAT, false, 16, 0);\n  gl.enableVertexAttribArray(aDispLoc);\n  gl.vertexAttribPointer(aDispLoc, 1, gl.FLOAT, false, 16, 12);\n\n  // ---------------------------------------------------------------------------\n  // Cursor & Fluid Wake Trail State\n  // ---------------------------------------------------------------------------\n  const TRAIL_LEN = 18;\n  const trail = [];\n  for (let i = 0; i < TRAIL_LEN; i++) {\n    trail.push({ x: 99, y: 99, active: 0 });\n  }\n\n  let pointerActive = false;\n  let lastPointerTime = -10000;\n  let cursorSX = 0; // sphere-normalized space (-1..1 around sphere radius)\n  let cursorSY = 0;\n  let smoothCX = 0;\n  let smoothCY = 0;\n\n  let width = 1, height = 1, dpr = 1;\n  const SPHERE_SCALE = 0.78;\n\n  function resize() {\n    dpr = Math.min(window.devicePixelRatio || 1, 2);\n    width = Math.max(1, Math.floor(window.innerWidth * dpr));\n    height = Math.max(1, Math.floor(window.innerHeight * dpr));\n    if (canvas.width !== width || canvas.height !== height) {\n      canvas.width = width;\n      canvas.height = height;\n    }\n    gl.viewport(0, 0, width, height);\n    gl.uniform2f(uResLoc, width, height);\n    gl.uniform1f(uScaleLoc, SPHERE_SCALE);\n    gl.uniform1f(uDprLoc, dpr);\n  }\n\n  window.addEventListener('resize', resize);\n  resize();\n\n  function updatePointerFromClient(clientX, clientY) {\n    const aspect = width / Math.max(height, 1);\n    const ndcX = (clientX / Math.max(1, window.innerWidth)) * 2 - 1;\n    const ndcY = -((clientY / Math.max(1, window.innerHeight)) * 2 - 1);\n    // Map NDC to sphere local X/Y (accounting for perspective ~1.18 at front surface)\n    cursorSX = (ndcX * aspect) / (SPHERE_SCALE * 1.18);\n    cursorSY = ndcY / (SPHERE_SCALE * 1.18);\n    pointerActive = true;\n    lastPointerTime = performance.now();\n  }\n\n  canvas.addEventListener('pointermove', e => {\n    updatePointerFromClient(e.clientX, e.clientY);\n  });\n\n  canvas.addEventListener('pointerdown', e => {\n    updatePointerFromClient(e.clientX, e.clientY);\n  });\n\n  canvas.addEventListener('pointerleave', () => {\n    pointerActive = false;\n  });\n\n  // ---------------------------------------------------------------------------\n  // Physics & Render Loop\n  // ---------------------------------------------------------------------------\n  gl.clearColor(0.0, 0.0, 0.0, 1.0);\n  gl.enable(gl.BLEND);\n  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);\n  gl.disable(gl.DEPTH_TEST);\n\n  const startTime = performance.now();\n\n  function frame(now) {\n    const t = (now - startTime) * 0.001;\n\n    // Gentle autonomous cursor sweep when idle so preview shows the signature fluid wake\n    const isIdle = !pointerActive && (now - lastPointerTime > 2400);\n    let targetActive = pointerActive ? 1.0 : 0.0;\n    let tx = cursorSX;\n    let ty = cursorSY;\n\n    if (isIdle) {\n      const cycle = t * 0.72;\n      tx = Math.sin(cycle) * 0.62 + Math.cos(cycle * 2.1) * 0.14;\n      ty = Math.sin(cycle * 1.45) * 0.52;\n      targetActive = 1.0;\n    }\n\n    smoothCX += (tx - smoothCX) * 0.24;\n    smoothCY += (ty - smoothCY) * 0.24;\n\n    // Shift wake trail history\n    for (let i = TRAIL_LEN - 1; i > 0; i--) {\n      trail[i].x = trail[i - 1].x;\n      trail[i].y = trail[i - 1].y;\n      trail[i].active = trail[i - 1].active * 0.91;\n    }\n    trail[0].x = smoothCX;\n    trail[0].y = smoothCY;\n    trail[0].active = targetActive;\n\n    // Slow continuous sphere rotation\n    const rotY = t * 0.16;\n    const rotX = Math.sin(t * 0.11) * 0.18 + 0.15;\n    const cosY = Math.cos(rotY), sinY = Math.sin(rotY);\n    const cosX = Math.cos(rotX), sinX = Math.sin(rotX);\n\n    const springK = 0.082;\n    const damping = 0.80;\n\n    // Update all 7,200 particles\n    for (let i = 0; i < COUNT; i++) {\n      const hx = homeX[i];\n      const hy = homeY[i];\n      const hz = homeZ[i];\n\n      // Rotate home lattice point\n      const rx1 = hx * cosY + hz * sinY;\n      const rz1 = -hx * sinY + hz * cosY;\n      const ry2 = hy * cosX - rz1 * sinX;\n      const rz2 = hy * sinX + rz1 * cosX;\n\n      let ox = offX[i];\n      let oy = offY[i];\n      let oz = offZ[i];\n      let vx = velX[i];\n      let vy = velY[i];\n      let vz = velZ[i];\n\n      // Current particle position\n      const px = rx1 + ox;\n      const py = ry2 + oy;\n      const pz = rz2 + oz;\n\n      // Apply fluid wake repulsion on the front hemisphere\n      if (pz > -0.15) {\n        const frontMask = Math.min(1.0, (pz + 0.15) * 1.4);\n\n        for (let k = 0; k < TRAIL_LEN; k++) {\n          const node = trail[k];\n          if (node.active < 0.04) continue;\n\n          const u = k / (TRAIL_LEN - 1);\n          // Teardrop / comet profile: wider at cursor head, tapering smoothly along tail\n          const radius = (0.31 - 0.19 * u) * node.active;\n          const dx = px - node.x;\n          const dy = py - node.y;\n          const distSq = dx * dx + dy * dy;\n\n          if (distSq < radius * radius) {\n            const dist = Math.sqrt(distSq) + 0.0001;\n            const falloff = 1.0 - dist / radius;\n            const strength = falloff * falloff * (0.046 * (1.0 - u * 0.72)) * frontMask * node.active;\n\n            const nx = dx / dist;\n            const ny = dy / dist;\n\n            // Push tangentially along sphere surface so particles bunch up into a crisp rim\n            vx += nx * strength;\n            vy += ny * strength;\n            vz -= falloff * 0.014 * frontMask * node.active;\n          }\n        }\n      }\n\n      // Spring back to home lattice position\n      vx = (vx - ox * springK) * damping;\n      vy = (vy - oy * springK) * damping;\n      vz = (vz - oz * springK) * damping;\n\n      ox += vx;\n      oy += vy;\n      oz += vz;\n\n      offX[i] = ox;\n      offY[i] = oy;\n      offZ[i] = oz;\n      velX[i] = vx;\n      velY[i] = vy;\n      velZ[i] = vz;\n\n      // Keep displaced particles gently hugging the spherical shell\n      let fx = rx1 + ox;\n      let fy = ry2 + oy;\n      let fz = rz2 + oz;\n      const dispMag = Math.hypot(ox, oy, oz);\n      if (dispMag > 0.001) {\n        const len = Math.hypot(fx, fy, fz) || 1;\n        const targetLen = 1.0 + Math.min(0.06, dispMag * 0.18);\n        const s = targetLen / len;\n        fx *= s;\n        fy *= s;\n        fz *= s;\n      }\n\n      const idx = i * 4;\n      vboData[idx]     = fx;\n      vboData[idx + 1] = fy;\n      vboData[idx + 2] = fz;\n      vboData[idx + 3] = dispMag;\n    }\n\n    gl.clear(gl.COLOR_BUFFER_BIT);\n    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);\n    gl.bufferSubData(gl.ARRAY_BUFFER, 0, vboData);\n    gl.drawArrays(gl.POINTS, 0, COUNT);\n\n    requestAnimationFrame(frame);\n  }\n\n  requestAnimationFrame(frame);\n})();\n</script>\n</body>\n</html>\n",
+    "controlParameterSet": {
+      "speeds": {
+        "animationSpeed": {
+          "label": "MASTER ANIMATION SPEED",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0,
+          "max": 4,
+          "step": 0.05,
+          "unit": "x"
+        },
+        "autoPlay": {
+          "label": "AUTO-PLAY / CONTINUOUS MOTION",
+          "value": true,
+          "defaultValue": true,
+          "type": "toggle"
+        },
+        "reverseDirection": {
+          "label": "REVERSE MOTION DIRECTION",
+          "value": false,
+          "defaultValue": false,
+          "type": "toggle"
+        },
+        "autoDrive": {
+          "label": "AUTO-ORBIT / AUTO-SCROLL DRIVE",
+          "value": false,
+          "defaultValue": false,
+          "type": "toggle"
+        },
+        "dragSensitivity": {
+          "label": "POINTER DRAG SENSITIVITY",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0.2,
+          "max": 3,
+          "step": 0.1,
+          "unit": "x"
+        },
+        "motionSmoothing": {
+          "label": "INERTIA / DAMPING FACTOR",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0.2,
+          "max": 3,
+          "step": 0.1,
+          "unit": "x"
+        },
+        "componentSpeeds": []
+      },
+      "effects": {
+        "scale": {
+          "label": "STAGE SCALE / ZOOM",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0.4,
+          "max": 2.2,
+          "step": 0.05,
+          "unit": "x"
+        },
+        "perspective": {
+          "label": "3D PERSPECTIVE DEPTH",
+          "value": 900,
+          "defaultValue": 900,
+          "min": 200,
+          "max": 2400,
+          "step": 25,
+          "unit": "px"
+        },
+        "tiltX": {
+          "label": "3D STAGE TILT X",
+          "value": 0,
+          "defaultValue": 0,
+          "min": -45,
+          "max": 45,
+          "step": 1,
+          "unit": "deg"
+        },
+        "tiltY": {
+          "label": "3D STAGE TILT Y",
+          "value": 0,
+          "defaultValue": 0,
+          "min": -45,
+          "max": 45,
+          "step": 1,
+          "unit": "deg"
+        },
+        "rotateZ": {
+          "label": "STAGE ROTATION Z",
+          "value": 0,
+          "defaultValue": 0,
+          "min": -180,
+          "max": 180,
+          "step": 1,
+          "unit": "deg"
+        },
+        "blur": {
+          "label": "OPTICAL GAUSSIAN BLUR",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 20,
+          "step": 0.5,
+          "unit": "px"
+        },
+        "glowIntensity": {
+          "label": "BLOOM / DROP-GLOW STRENGTH",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 60,
+          "step": 1,
+          "unit": "px"
+        },
+        "glowColor": {
+          "label": "BLOOM GLOW COLOUR",
+          "value": "#ff5500",
+          "defaultValue": "#ff5500",
+          "type": "color"
+        },
+        "liquidDistortion": {
+          "label": "LIQUID SVG TURBULENCE WARP",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 80,
+          "step": 1,
+          "unit": ""
+        },
+        "liquidFrequency": {
+          "label": "TURBULENCE WAVE FREQUENCY",
+          "value": 0.015,
+          "defaultValue": 0.015,
+          "min": 0.002,
+          "max": 0.06,
+          "step": 0.002,
+          "unit": ""
+        },
+        "vignette": {
+          "label": "STUDIO RADIAL VIGNETTE",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 90,
+          "step": 2,
+          "unit": "%"
+        },
+        "componentEffects": []
+      },
+      "colours": {
+        "backgroundColor": {
+          "label": "STAGE BACKGROUND COLOUR",
+          "value": "#000000",
+          "defaultValue": "#000000",
+          "type": "color"
+        },
+        "hueRotate": {
+          "label": "HUE SHIFT ANGLE",
+          "value": 0,
+          "defaultValue": 0,
+          "min": -180,
+          "max": 180,
+          "step": 1,
+          "unit": "deg"
+        },
+        "saturate": {
+          "label": "COLOUR SATURATION",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 0,
+          "max": 300,
+          "step": 5,
+          "unit": "%"
+        },
+        "brightness": {
+          "label": "EXPOSURE BRIGHTNESS",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 40,
+          "max": 220,
+          "step": 5,
+          "unit": "%"
+        },
+        "contrast": {
+          "label": "TONAL CONTRAST",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 40,
+          "max": 220,
+          "step": 5,
+          "unit": "%"
+        },
+        "invert": {
+          "label": "INVERT / NEGATIVE",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "unit": "%"
+        },
+        "sepia": {
+          "label": "WARM SEPIA FILTER",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "unit": "%"
+        },
+        "tintColor": {
+          "label": "OVERLAY TINT COLOUR",
+          "value": "#ff5500",
+          "defaultValue": "#ff5500",
+          "type": "color"
+        },
+        "tintOpacity": {
+          "label": "OVERLAY TINT OPACITY",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 85,
+          "step": 5,
+          "unit": "%"
+        },
+        "hexColorParams": [
+          {
+            "key": "hex_1",
+            "label": "PRIMARY SURFACE HEX",
+            "value": "#000000",
+            "defaultValue": "#000000",
+            "rawHex": "#000000"
+          }
+        ],
+        "shaderColorParams": [
+          {
+            "key": "vec3_dotWhite",
+            "varName": "dotWhite",
+            "label": "SHADER DOT WHITE",
+            "value": "#fafcff",
+            "defaultValue": "#fafcff",
+            "rawMatch": "vec3 dotWhite  = vec3(0.98, 0.99, 1.00)"
+          },
+          {
+            "key": "vec3_wakeCoral",
+            "varName": "wakeCoral",
+            "label": "SHADER WAKE CORAL",
+            "value": "#ff6b7a",
+            "defaultValue": "#ff6b7a",
+            "rawMatch": "vec3 wakeCoral = vec3(1.00, 0.42, 0.48)"
+          }
+        ]
+      },
+      "htmlProperties": {
+        "documentTitle": {
+          "label": "HTML <TITLE> PROPERTY",
+          "value": "Orb 08 — Interactive Fibonacci Particle Sphere with Fluid Repulsion Wake",
+          "defaultValue": "Orb 08 — Interactive Fibonacci Particle Sphere with Fluid Repulsion Wake",
+          "type": "text"
+        },
+        "bodyId": {
+          "label": "BODY [ID] ATTRIBUTE",
+          "value": "orbs-orb-8",
+          "defaultValue": "orbs-orb-8",
+          "type": "text"
+        },
+        "bodyClass": {
+          "label": "BODY [CLASS] ATTRIBUTE",
+          "value": "",
+          "defaultValue": "",
+          "type": "text"
+        },
+        "bodyDir": {
+          "label": "HTML [DIR] DIRECTION",
+          "value": "ltr",
+          "defaultValue": "ltr",
+          "options": [
+            "ltr",
+            "rtl"
+          ]
+        },
+        "dataTheme": {
+          "label": "BODY [DATA-THEME] ATTRIBUTE",
+          "value": "dark-carbon",
+          "defaultValue": "dark-carbon",
+          "type": "text"
+        },
+        "fontFamily": {
+          "label": "COMPONENT FONT-FAMILY",
+          "value": "Inter, system-ui, sans-serif",
+          "defaultValue": "Inter, system-ui, sans-serif",
+          "options": [
+            "Inter, system-ui, sans-serif",
+            "monospace",
+            "sans-serif"
+          ]
+        },
+        "cursor": {
+          "label": "STAGE [STYLE.CURSOR]",
+          "value": "grab",
+          "defaultValue": "grab",
+          "options": [
+            "default",
+            "grab",
+            "pointer",
+            "crosshair",
+            "none"
+          ]
+        },
+        "overflow": {
+          "label": "BODY [STYLE.OVERFLOW]",
+          "value": "hidden",
+          "defaultValue": "hidden",
+          "options": [
+            "hidden",
+            "visible",
+            "auto"
+          ]
+        },
+        "opacity": {
+          "label": "BODY [STYLE.OPACITY]",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0.1,
+          "max": 1,
+          "step": 0.05
+        },
+        "padding": {
+          "label": "BODY [STYLE.PADDING]",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 64,
+          "step": 2,
+          "unit": "px"
+        },
+        "borderRadius": {
+          "label": "STAGE [STYLE.BORDER-RADIUS]",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 80,
+          "step": 2,
+          "unit": "px"
+        },
+        "borderWidth": {
+          "label": "STAGE [STYLE.BORDER-WIDTH]",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 16,
+          "step": 1,
+          "unit": "px"
+        },
+        "borderColor": {
+          "label": "STAGE [STYLE.BORDER-COLOR]",
+          "value": "#ff5500",
+          "defaultValue": "#ff5500",
+          "type": "color"
+        },
+        "stageWidth": {
+          "label": "STAGE [STYLE.WIDTH]",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 30,
+          "max": 100,
+          "step": 2,
+          "unit": "%"
+        },
+        "stageHeight": {
+          "label": "STAGE [STYLE.HEIGHT]",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 30,
+          "max": 100,
+          "step": 2,
+          "unit": "%"
+        },
+        "mixBlendMode": {
+          "label": "STAGE [STYLE.MIX-BLEND-MODE]",
+          "value": "normal",
+          "defaultValue": "normal",
+          "options": [
+            "normal",
+            "screen",
+            "lighten",
+            "multiply",
+            "difference",
+            "exclusion",
+            "overlay"
+          ]
+        },
+        "domElements": [],
+        "cssRuleParams": [],
         "stringParams": [],
         "imageSlots": []
       }
@@ -13207,6 +14071,450 @@ window.ORIGINKIT_COMPONENTS = [
             ]
           }
         ],
+        "stringParams": [],
+        "imageSlots": []
+      }
+    }
+  },
+  {
+    "id": "assets__asset-31",
+    "section": "assets",
+    "name": "asset 31",
+    "rawTitle": "Asset 31 — Moonlit Night Sakura Canopy &amp; Drifting Petals",
+    "displayTitle": "Asset 31 — Moonlit Night Sakura Canopy &amp; Drifting Petals",
+    "folderPath": "designs/assets/asset 31/",
+    "htmlPath": "designs/assets/asset 31/index.html",
+    "videoPath": "",
+    "engine": "CANVAS 2D",
+    "hasImages": false,
+    "hasBlueDefault": false,
+    "defaultBgColor": "#020105",
+    "htmlSource": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>Asset 31 — Moonlit Night Sakura Canopy &amp; Drifting Petals</title>\n<style>\n  *, *::before, *::after {\n    box-sizing: border-box;\n    margin: 0;\n    padding: 0;\n  }\n\n  html, body {\n    width: 100%;\n    height: 100%;\n    overflow: hidden;\n    background: #020105;\n    user-select: none;\n    -webkit-font-smoothing: antialiased;\n  }\n\n  canvas {\n    display: block;\n    width: 100vw;\n    height: 100vh;\n    cursor: pointer;\n  }\n</style>\n</head>\n<body>\n<canvas id=\"sakuraCanvas\"></canvas>\n\n<script>\n(() => {\n  const canvas = document.getElementById('sakuraCanvas');\n  const ctx = canvas.getContext('2d');\n  if (!ctx) return;\n\n  // Deterministic PRNG for consistent botanical layout\n  let seed = 31072026;\n  function rand() {\n    seed = (seed * 1664525 + 1013904223) >>> 0;\n    return seed / 4294967296;\n  }\n\n  // ---------------------------------------------------------------------------\n  // Pre-rendered High-Resolution 5-Petal Sakura Blossom Sprites\n  // ---------------------------------------------------------------------------\n  function createBlossomSprite(palette) {\n    const size = 96;\n    const c = document.createElement('canvas');\n    c.width = size;\n    c.height = size;\n    const g = c.getContext('2d');\n    const cx = size / 2;\n    const cy = size / 2;\n\n    // Soft outer luminous halo\n    const halo = g.createRadialGradient(cx, cy, 4, cx, cy, size * 0.48);\n    halo.addColorStop(0, palette.glow);\n    halo.addColorStop(1, 'rgba(220, 150, 255, 0)');\n    g.fillStyle = halo;\n    g.beginPath();\n    g.arc(cx, cy, size * 0.48, 0, Math.PI * 2);\n    g.fill();\n\n    // 5 notched sakura petals\n    for (let i = 0; i < 5; i++) {\n      g.save();\n      g.translate(cx, cy);\n      g.rotate((i * Math.PI * 2) / 5 - Math.PI / 2);\n\n      const pLen = size * 0.34;\n      const pWid = size * 0.175;\n      const grad = g.createLinearGradient(0, 0, 0, -pLen);\n      grad.addColorStop(0, palette.inner);\n      grad.addColorStop(0.55, palette.mid);\n      grad.addColorStop(1, palette.tip);\n\n      g.fillStyle = grad;\n      g.beginPath();\n      g.moveTo(0, -2);\n      g.bezierCurveTo(-pWid * 1.05, -pLen * 0.25, -pWid * 1.15, -pLen * 0.85, -pWid * 0.24, -pLen);\n      g.lineTo(0, -pLen * 0.84); // classic sakura petal notch\n      g.lineTo(pWid * 0.24, -pLen);\n      g.bezierCurveTo(pWid * 1.15, -pLen * 0.85, pWid * 1.05, -pLen * 0.25, 0, -2);\n      g.closePath();\n      g.fill();\n      g.restore();\n    }\n\n    // Tiny glowing flower center & delicate stamens\n    const coreGrad = g.createRadialGradient(cx, cy, 0, cx, cy, size * 0.10);\n    coreGrad.addColorStop(0, palette.center);\n    coreGrad.addColorStop(1, 'rgba(120, 50, 140, 0)');\n    g.fillStyle = coreGrad;\n    g.beginPath();\n    g.arc(cx, cy, size * 0.10, 0, Math.PI * 2);\n    g.fill();\n\n    return c;\n  }\n\n  const blossomSprites = [\n    // 0: Deep twilight shadow blossom (back layer)\n    createBlossomSprite({\n      inner: '#6a3885',\n      mid: '#9f64be',\n      tip: '#c796e2',\n      center: '#3f1955',\n      glow: 'rgba(155, 85, 200, 0.20)'\n    }),\n    // 1: Rich orchid-lavender blossom (mid layer)\n    createBlossomSprite({\n      inner: '#b46bd8',\n      mid: '#dfa3f8',\n      tip: '#f4d3ff',\n      center: '#7b389d',\n      glow: 'rgba(210, 130, 255, 0.28)'\n    }),\n    // 2: Soft pale sakura pink-lavender (front layer)\n    createBlossomSprite({\n      inner: '#d088ec',\n      mid: '#f2c4ff',\n      tip: '#fff0ff',\n      center: '#944ab5',\n      glow: 'rgba(236, 175, 255, 0.36)'\n    }),\n    // 3: Radiant moonlit rim blossom (highlight layer)\n    createBlossomSprite({\n      inner: '#e5aef9',\n      mid: '#fae2ff',\n      tip: '#ffffff',\n      center: '#b064cf',\n      glow: 'rgba(250, 210, 255, 0.48)'\n    })\n  ];\n\n  // ---------------------------------------------------------------------------\n  // Scene Geometry: Organic Branches, Canopy Blossoms, Ambient Glows, & Petals\n  // ---------------------------------------------------------------------------\n  let width = 1, height = 1, dpr = 1;\n  let branches = [];\n  let blossoms = [];\n  let glowOrbs = [];\n  let petals = [];\n\n  // Mouse wind interaction\n  let mouseX = -9999, mouseY = -9999;\n  let windForceX = 0, windForceY = 0;\n  let lastMouseX = 0, lastMouseY = 0;\n\n  function buildCanopy() {\n    seed = 31072026;\n    branches = [];\n    blossoms = [];\n    glowOrbs = [];\n\n    const W = width;\n    const H = height;\n    const minDim = Math.min(W, H);\n\n    // Recursive organic sakura twig builder\n    function growBranch(x, y, angle, length, thickness, depth, swayGroup) {\n      const steps = 4;\n      const pts = [{ x, y }];\n      let cx = x, cy = y, curAngle = angle;\n\n      for (let s = 1; s <= steps; s++) {\n        curAngle += (rand() - 0.5) * 0.22;\n        cx += Math.cos(curAngle) * (length / steps);\n        cy += Math.sin(curAngle) * (length / steps);\n        pts.push({ x: cx, y: cy });\n      }\n\n      branches.push({\n        pts,\n        thickness,\n        depth,\n        swayGroup,\n        phase: rand() * Math.PI * 2\n      });\n\n      // Spawn blossom clusters along mid-to-outer branches\n      if (depth <= 3) {\n        const clusterCount = depth === 0 ? 7 : depth === 1 ? 6 : 4;\n        for (let c = 0; c < clusterCount; c++) {\n          const frac = 0.25 + rand() * 0.75;\n          const pIdx = Math.min(steps - 1, Math.floor(frac * steps));\n          const pA = pts[pIdx];\n          const pB = pts[pIdx + 1];\n          const tLocal = frac * steps - pIdx;\n          const bx = pA.x + (pB.x - pA.x) * tLocal + (rand() - 0.5) * minDim * 0.09;\n          const by = pA.y + (pB.y - pA.y) * tLocal + (rand() - 0.5) * minDim * 0.09;\n\n          // Keep canopy shaped like a sweeping crescent/dome on the left ~72%\n          const normY = by / H;\n          const rightEdge = W * (0.64 + 0.10 * Math.sin(normY * Math.PI) - 0.14 * Math.pow(Math.max(0, normY - 0.55), 1.6));\n          if (bx > rightEdge + minDim * 0.04) continue;\n\n          const edgeDist = Math.max(0, 1 - Math.abs(bx - rightEdge) / (W * 0.22));\n          const layerRoll = rand();\n          let spriteIdx = 1;\n          if (layerRoll < 0.24) spriteIdx = 0;\n          else if (layerRoll < 0.62) spriteIdx = 1;\n          else if (layerRoll < 0.88) spriteIdx = 2;\n          else spriteIdx = 3;\n          if (edgeDist > 0.55 && rand() < 0.55) spriteIdx = Math.min(3, spriteIdx + 1);\n\n          const baseSize = minDim * (0.020 + rand() * 0.026) * (0.85 + 0.25 * (spriteIdx / 3));\n          blossoms.push({\n            x: bx,\n            y: by,\n            size: baseSize,\n            rot: rand() * Math.PI * 2,\n            spriteIdx,\n            phase: rand() * Math.PI * 2,\n            swayAmp: (0.4 + 0.8 * (1 - depth / 4)) * (minDim * 0.008),\n            shimmerSpeed: 0.7 + rand() * 1.4,\n            alpha: spriteIdx === 0 ? 0.58 + rand() * 0.22 : 0.80 + rand() * 0.20\n          });\n        }\n      }\n\n      if (depth <= 0) return;\n\n      const subBranches = depth >= 3 ? 3 : 2;\n      for (let i = 0; i < subBranches; i++) {\n        const splitFrac = 0.45 + rand() * 0.55;\n        const pIdx = Math.min(steps, Math.round(splitFrac * steps));\n        const origin = pts[pIdx];\n        const spread = (i - (subBranches - 1) / 2) * (0.48 + rand() * 0.26) + (rand() - 0.5) * 0.25;\n        growBranch(\n          origin.x,\n          origin.y,\n          curAngle + spread,\n          length * (0.64 + rand() * 0.16),\n          thickness * 0.64,\n          depth - 1,\n          swayGroup\n        );\n      }\n    }\n\n    // Major sweeping trunks/boughs entering from bottom-left, left, and top-left\n    growBranch(-W * 0.06, H * 1.06, -0.82, minDim * 0.42, minDim * 0.009, 4, 0);\n    growBranch(-W * 0.04, H * 0.82, -0.42, minDim * 0.36, minDim * 0.007, 4, 1);\n    growBranch(-W * 0.05, H * 0.50, -0.10, minDim * 0.38, minDim * 0.007, 4, 2);\n    growBranch(-W * 0.05, H * 0.20,  0.18, minDim * 0.36, minDim * 0.007, 4, 3);\n    growBranch( W * 0.14, -H * 0.06, 0.78, minDim * 0.34, minDim * 0.006, 3, 4);\n    growBranch( W * 0.36, -H * 0.05, 1.08, minDim * 0.28, minDim * 0.005, 3, 5);\n\n    // Extra dense filler canopy clusters so the sakura mass looks full and organic\n    const EXTRA_CLUSTERS = 460;\n    for (let i = 0; i < EXTRA_CLUSTERS; i++) {\n      const ny = rand();\n      const rightEdge = W * (0.65 + 0.09 * Math.sin(ny * Math.PI) - 0.18 * Math.pow(Math.max(0, ny - 0.52), 1.5));\n      // Cluster bias toward middle and outer rim with natural negative-space pockets\n      const u = Math.pow(rand(), 0.78);\n      const bx = u * rightEdge;\n      const by = ny * H;\n\n      // Carve a few organic dark sky pockets inside the canopy (like the video)\n      const pocket1 = Math.hypot((bx - W * 0.30) / (W * 0.14), (by - H * 0.42) / (H * 0.15));\n      const pocket2 = Math.hypot((bx - W * 0.14) / (W * 0.12), (by - H * 0.86) / (H * 0.16));\n      if (pocket1 < 0.72 && rand() < 0.78) continue;\n      if (pocket2 < 0.82 && rand() < 0.72) continue;\n\n      const nearRim = bx > rightEdge * 0.76;\n      let spriteIdx = Math.floor(rand() * 3);\n      if (nearRim && rand() < 0.65) spriteIdx = 3;\n\n      blossoms.push({\n        x: bx,\n        y: by,\n        size: minDim * (0.017 + rand() * 0.027),\n        rot: rand() * Math.PI * 2,\n        spriteIdx,\n        phase: rand() * Math.PI * 2,\n        swayAmp: (0.45 + rand() * 0.75) * (minDim * 0.009),\n        shimmerSpeed: 0.6 + rand() * 1.3,\n        alpha: spriteIdx === 0 ? 0.52 + rand() * 0.25 : 0.78 + rand() * 0.22\n      });\n    }\n\n    // Sort back-to-front so brighter moonlit blossoms layer cleanly over deeper ones\n    blossoms.sort((a, b) => a.spriteIdx - b.spriteIdx);\n\n    // Soft ambient bloom clouds behind the canopy rim\n    for (let i = 0; i < 18; i++) {\n      const ny = (i / 17);\n      const rightEdge = W * (0.62 + 0.08 * Math.sin(ny * Math.PI) - 0.16 * Math.pow(Math.max(0, ny - 0.55), 1.5));\n      glowOrbs.push({\n        x: rightEdge * (0.45 + 0.50 * rand()),\n        y: ny * H,\n        r: minDim * (0.16 + rand() * 0.14),\n        alpha: 0.07 + rand() * 0.06,\n        phase: rand() * Math.PI * 2\n      });\n    }\n  }\n\n  // ---------------------------------------------------------------------------\n  // Drifting / Tumbling Loose Sakura Petals\n  // ---------------------------------------------------------------------------\n  function spawnPetal(anywhere) {\n    const W = width;\n    const H = height;\n    const minDim = Math.min(W, H);\n    const ny = rand();\n    const canopyEdge = W * (0.58 + 0.09 * Math.sin(ny * Math.PI));\n\n    const isBokeh = rand() < 0.22;\n    return {\n      x: anywhere ? canopyEdge * 0.4 + rand() * (W - canopyEdge * 0.35) : canopyEdge * (0.65 + rand() * 0.35),\n      y: anywhere ? rand() * H : ny * H,\n      vx: (0.30 + rand() * 0.55) * (minDim / 900),\n      vy: (-0.18 + rand() * 0.52) * (minDim / 900),\n      size: minDim * (isBokeh ? (0.009 + rand() * 0.011) : (0.0055 + rand() * 0.0075)),\n      rot: rand() * Math.PI * 2,\n      rotSpeed: (rand() - 0.5) * 0.035,\n      tumble: rand() * Math.PI * 2,\n      tumbleSpeed: 0.025 + rand() * 0.045,\n      wobblePhase: rand() * Math.PI * 2,\n      wobbleFreq: 0.8 + rand() * 1.4,\n      alpha: isBokeh ? (0.35 + rand() * 0.35) : (0.65 + rand() * 0.35),\n      isBokeh,\n      life: 1.0\n    };\n  }\n\n  function initPetals() {\n    petals = [];\n    for (let i = 0; i < 95; i++) {\n      petals.push(spawnPetal(true));\n    }\n  }\n\n  // ---------------------------------------------------------------------------\n  // Resize & Pointer Interaction\n  // ---------------------------------------------------------------------------\n  function resize() {\n    dpr = Math.min(window.devicePixelRatio || 1, 2);\n    width = Math.max(1, Math.floor(window.innerWidth * dpr));\n    height = Math.max(1, Math.floor(window.innerHeight * dpr));\n    if (canvas.width !== width || canvas.height !== height) {\n      canvas.width = width;\n      canvas.height = height;\n    }\n    buildCanopy();\n    initPetals();\n  }\n\n  window.addEventListener('resize', resize);\n\n  canvas.addEventListener('pointermove', e => {\n    const x = e.clientX * dpr;\n    const y = e.clientY * dpr;\n    if (mouseX > -9000) {\n      windForceX = Math.max(-18, Math.min(18, windForceX + (x - lastMouseX) * 0.12));\n      windForceY = Math.max(-18, Math.min(18, windForceY + (y - lastMouseY) * 0.12));\n    }\n    mouseX = x;\n    mouseY = y;\n    lastMouseX = x;\n    lastMouseY = y;\n  });\n\n  canvas.addEventListener('pointerdown', e => {\n    const x = e.clientX * dpr;\n    const y = e.clientY * dpr;\n    const minDim = Math.min(width, height);\n    for (let i = 0; i < 14; i++) {\n      const p = spawnPetal(false);\n      p.x = x + (rand() - 0.5) * minDim * 0.08;\n      p.y = y + (rand() - 0.5) * minDim * 0.08;\n      p.vx = (0.6 + rand() * 1.2) * (minDim / 900);\n      p.vy = (-0.5 + rand() * 1.0) * (minDim / 900);\n      petals.push(p);\n    }\n    if (petals.length > 180) petals.splice(0, petals.length - 180);\n  });\n\n  resize();\n\n  // ---------------------------------------------------------------------------\n  // Render Loop\n  // ---------------------------------------------------------------------------\n  const startTime = performance.now();\n\n  function drawPetal(p) {\n    ctx.save();\n    ctx.translate(p.x, p.y);\n    ctx.rotate(p.rot);\n\n    const scaleY = 0.30 + 0.70 * Math.abs(Math.cos(p.tumble));\n    ctx.scale(1, scaleY);\n\n    if (p.isBokeh) {\n      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, p.size * 1.6);\n      g.addColorStop(0, `rgba(255, 232, 255, ${p.alpha})`);\n      g.addColorStop(0.45, `rgba(232, 180, 255, ${p.alpha * 0.55})`);\n      g.addColorStop(1, 'rgba(200, 120, 255, 0)');\n      ctx.fillStyle = g;\n      ctx.beginPath();\n      ctx.arc(0, 0, p.size * 1.6, 0, Math.PI * 2);\n      ctx.fill();\n    } else {\n      // Crisp single sakura petal with subtle tip notch & luminous core\n      const s = p.size;\n      const grad = ctx.createLinearGradient(-s, 0, s, 0);\n      grad.addColorStop(0, `rgba(218, 165, 245, ${p.alpha})`);\n      grad.addColorStop(0.55, `rgba(248, 224, 255, ${p.alpha})`);\n      grad.addColorStop(1, `rgba(255, 250, 255, ${p.alpha})`);\n\n      ctx.fillStyle = grad;\n      ctx.beginPath();\n      ctx.moveTo(-s, 0);\n      ctx.bezierCurveTo(-s * 0.4, -s * 0.75, s * 0.65, -s * 0.72, s, -s * 0.16);\n      ctx.lineTo(s * 0.78, 0);\n      ctx.lineTo(s, s * 0.16);\n      ctx.bezierCurveTo(s * 0.65, s * 0.72, -s * 0.4, s * 0.75, -s, 0);\n      ctx.closePath();\n      ctx.fill();\n    }\n    ctx.restore();\n  }\n\n  function frame(now) {\n    const t = (now - startTime) * 0.001;\n\n    windForceX *= 0.94;\n    windForceY *= 0.94;\n\n    // 1. Deep Midnight Sky Background\n    ctx.globalCompositeOperation = 'source-over';\n    ctx.fillStyle = '#020105';\n    ctx.fillRect(0, 0, width, height);\n\n    // 2. Ethereal Canopy Moonlight Aura (Bloom Layer)\n    ctx.globalCompositeOperation = 'lighter';\n    for (let i = 0; i < glowOrbs.length; i++) {\n      const o = glowOrbs[i];\n      const pulse = 0.88 + 0.12 * Math.sin(t * 0.9 + o.phase);\n      const gx = o.x + Math.sin(t * 0.6 + o.phase) * 8;\n      const gy = o.y + Math.cos(t * 0.5 + o.phase) * 6;\n      const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, o.r);\n      grad.addColorStop(0, `rgba(216, 146, 255, ${o.alpha * pulse})`);\n      grad.addColorStop(0.5, `rgba(150, 82, 200, ${o.alpha * 0.45 * pulse})`);\n      grad.addColorStop(1, 'rgba(80, 30, 120, 0)');\n      ctx.fillStyle = grad;\n      ctx.beginPath();\n      ctx.arc(gx, gy, o.r, 0, Math.PI * 2);\n      ctx.fill();\n    }\n\n    // 3. Delicate Night Branches & Wispy Twigs\n    ctx.globalCompositeOperation = 'source-over';\n    ctx.lineCap = 'round';\n    ctx.lineJoin = 'round';\n\n    const breeze = Math.sin(t * 0.85) * 0.6 + Math.sin(t * 1.7) * 0.25;\n\n    for (let i = 0; i < branches.length; i++) {\n      const b = branches[i];\n      const pts = b.pts;\n      const swayStrength = (4.5 - b.depth) * 1.4;\n      const sx = (Math.sin(t * 0.9 + b.phase) + breeze * 0.6) * swayStrength + windForceX * 0.35;\n      const sy = Math.cos(t * 0.75 + b.phase) * swayStrength * 0.6 + windForceY * 0.25;\n\n      // Subtle moonlit violet-lavender twig silhouette\n      const lum = b.depth <= 1 ? 0.42 : 0.28;\n      ctx.strokeStyle = `rgba(175, 132, 198, ${lum})`;\n      ctx.lineWidth = Math.max(0.75 * dpr, b.thickness);\n      ctx.beginPath();\n      ctx.moveTo(pts[0].x, pts[0].y);\n      for (let p = 1; p < pts.length; p++) {\n        const w = p / (pts.length - 1);\n        ctx.lineTo(pts[p].x + sx * w, pts[p].y + sy * w);\n      }\n      ctx.stroke();\n    }\n\n    // 4. Dense Layered 5-Petal Sakura Blossoms\n    for (let i = 0; i < blossoms.length; i++) {\n      const fl = blossoms[i];\n      const swayX = Math.sin(t * 0.95 + fl.phase) * fl.swayAmp + breeze * fl.swayAmp * 0.45;\n      const swayY = Math.cos(t * 0.78 + fl.phase * 1.1) * fl.swayAmp * 0.65;\n\n      let bx = fl.x + swayX;\n      let by = fl.y + swayY;\n\n      // Subtle interactive breeze ripple near pointer\n      const dx = bx - mouseX;\n      const dy = by - mouseY;\n      const dSq = dx * dx + dy * dy;\n      const mRad = 150 * dpr;\n      if (dSq < mRad * mRad && dSq > 1) {\n        const d = Math.sqrt(dSq);\n        const push = (1 - d / mRad) * 14 * dpr;\n        bx += (dx / d) * push + windForceX * 0.4;\n        by += (dy / d) * push + windForceY * 0.4;\n      }\n\n      const shimmer = 0.90 + 0.10 * Math.sin(t * fl.shimmerSpeed + fl.phase);\n      const sprite = blossomSprites[fl.spriteIdx];\n      const drawSize = fl.size * (0.97 + 0.03 * shimmer);\n\n      ctx.globalAlpha = fl.alpha * shimmer;\n      ctx.save();\n      ctx.translate(bx, by);\n      ctx.rotate(fl.rot + Math.sin(t * 0.65 + fl.phase) * 0.08);\n      ctx.drawImage(sprite, -drawSize * 0.5, -drawSize * 0.5, drawSize, drawSize);\n      ctx.restore();\n    }\n    ctx.globalAlpha = 1.0;\n\n    // 5. Drifting & Tumbling Loose Sakura Petals across the Night Sky\n    for (let i = 0; i < petals.length; i++) {\n      const p = petals[i];\n      const wobble = Math.sin(t * p.wobbleFreq + p.wobblePhase);\n\n      p.x += p.vx + wobble * 0.22 * dpr + windForceX * 0.04;\n      p.y += p.vy + Math.cos(t * p.wobbleFreq * 0.8 + p.wobblePhase) * 0.26 * dpr + windForceY * 0.04;\n      p.rot += p.rotSpeed + wobble * 0.01;\n      p.tumble += p.tumbleSpeed;\n\n      // Gentle swirl from mouse\n      const dx = p.x - mouseX;\n      const dy = p.y - mouseY;\n      const dSq = dx * dx + dy * dy;\n      const pRad = 120 * dpr;\n      if (dSq < pRad * pRad && dSq > 1) {\n        const d = Math.sqrt(dSq);\n        const f = (1 - d / pRad) * 1.4 * dpr;\n        p.x += (dx / d) * f + windForceX * 0.15;\n        p.y += (dy / d) * f + windForceY * 0.15;\n      }\n\n      drawPetal(p);\n\n      // Respawn when drifting off screen\n      if (p.x > width + 40 * dpr || p.y < -40 * dpr || p.y > height + 40 * dpr) {\n        petals[i] = spawnPetal(false);\n      }\n    }\n\n    requestAnimationFrame(frame);\n  }\n\n  requestAnimationFrame(frame);\n})();\n</script>\n</body>\n</html>\n",
+    "controlParameterSet": {
+      "speeds": {
+        "animationSpeed": {
+          "label": "MASTER ANIMATION SPEED",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0,
+          "max": 4,
+          "step": 0.05,
+          "unit": "x"
+        },
+        "autoPlay": {
+          "label": "AUTO-PLAY / CONTINUOUS MOTION",
+          "value": true,
+          "defaultValue": true,
+          "type": "toggle"
+        },
+        "reverseDirection": {
+          "label": "REVERSE MOTION DIRECTION",
+          "value": false,
+          "defaultValue": false,
+          "type": "toggle"
+        },
+        "autoDrive": {
+          "label": "AUTO-ORBIT / AUTO-SCROLL DRIVE",
+          "value": false,
+          "defaultValue": false,
+          "type": "toggle"
+        },
+        "dragSensitivity": {
+          "label": "POINTER DRAG SENSITIVITY",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0.2,
+          "max": 3,
+          "step": 0.1,
+          "unit": "x"
+        },
+        "motionSmoothing": {
+          "label": "INERTIA / DAMPING FACTOR",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0.2,
+          "max": 3,
+          "step": 0.1,
+          "unit": "x"
+        },
+        "componentSpeeds": []
+      },
+      "effects": {
+        "scale": {
+          "label": "STAGE SCALE / ZOOM",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0.4,
+          "max": 2.2,
+          "step": 0.05,
+          "unit": "x"
+        },
+        "perspective": {
+          "label": "3D PERSPECTIVE DEPTH",
+          "value": 900,
+          "defaultValue": 900,
+          "min": 200,
+          "max": 2400,
+          "step": 25,
+          "unit": "px"
+        },
+        "tiltX": {
+          "label": "3D STAGE TILT X",
+          "value": 0,
+          "defaultValue": 0,
+          "min": -45,
+          "max": 45,
+          "step": 1,
+          "unit": "deg"
+        },
+        "tiltY": {
+          "label": "3D STAGE TILT Y",
+          "value": 0,
+          "defaultValue": 0,
+          "min": -45,
+          "max": 45,
+          "step": 1,
+          "unit": "deg"
+        },
+        "rotateZ": {
+          "label": "STAGE ROTATION Z",
+          "value": 0,
+          "defaultValue": 0,
+          "min": -180,
+          "max": 180,
+          "step": 1,
+          "unit": "deg"
+        },
+        "blur": {
+          "label": "OPTICAL GAUSSIAN BLUR",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 20,
+          "step": 0.5,
+          "unit": "px"
+        },
+        "glowIntensity": {
+          "label": "BLOOM / DROP-GLOW STRENGTH",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 60,
+          "step": 1,
+          "unit": "px"
+        },
+        "glowColor": {
+          "label": "BLOOM GLOW COLOUR",
+          "value": "#ff5500",
+          "defaultValue": "#ff5500",
+          "type": "color"
+        },
+        "liquidDistortion": {
+          "label": "LIQUID SVG TURBULENCE WARP",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 80,
+          "step": 1,
+          "unit": ""
+        },
+        "liquidFrequency": {
+          "label": "TURBULENCE WAVE FREQUENCY",
+          "value": 0.015,
+          "defaultValue": 0.015,
+          "min": 0.002,
+          "max": 0.06,
+          "step": 0.002,
+          "unit": ""
+        },
+        "vignette": {
+          "label": "STUDIO RADIAL VIGNETTE",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 90,
+          "step": 2,
+          "unit": "%"
+        },
+        "componentEffects": []
+      },
+      "colours": {
+        "backgroundColor": {
+          "label": "STAGE BACKGROUND COLOUR",
+          "value": "#020105",
+          "defaultValue": "#020105",
+          "type": "color"
+        },
+        "hueRotate": {
+          "label": "HUE SHIFT ANGLE",
+          "value": 0,
+          "defaultValue": 0,
+          "min": -180,
+          "max": 180,
+          "step": 1,
+          "unit": "deg"
+        },
+        "saturate": {
+          "label": "COLOUR SATURATION",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 0,
+          "max": 300,
+          "step": 5,
+          "unit": "%"
+        },
+        "brightness": {
+          "label": "EXPOSURE BRIGHTNESS",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 40,
+          "max": 220,
+          "step": 5,
+          "unit": "%"
+        },
+        "contrast": {
+          "label": "TONAL CONTRAST",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 40,
+          "max": 220,
+          "step": 5,
+          "unit": "%"
+        },
+        "invert": {
+          "label": "INVERT / NEGATIVE",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "unit": "%"
+        },
+        "sepia": {
+          "label": "WARM SEPIA FILTER",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "unit": "%"
+        },
+        "tintColor": {
+          "label": "OVERLAY TINT COLOUR",
+          "value": "#ff5500",
+          "defaultValue": "#ff5500",
+          "type": "color"
+        },
+        "tintOpacity": {
+          "label": "OVERLAY TINT OPACITY",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 85,
+          "step": 5,
+          "unit": "%"
+        },
+        "hexColorParams": [
+          {
+            "key": "hex_1",
+            "label": "PRIMARY SURFACE HEX",
+            "value": "#020105",
+            "defaultValue": "#020105",
+            "rawHex": "#020105"
+          },
+          {
+            "key": "hex_2",
+            "label": "PALETTE HEX 2",
+            "value": "#6a3885",
+            "defaultValue": "#6a3885",
+            "rawHex": "#6a3885"
+          },
+          {
+            "key": "hex_3",
+            "label": "PALETTE HEX 3",
+            "value": "#9f64be",
+            "defaultValue": "#9f64be",
+            "rawHex": "#9f64be"
+          },
+          {
+            "key": "hex_4",
+            "label": "PALETTE HEX 4",
+            "value": "#c796e2",
+            "defaultValue": "#c796e2",
+            "rawHex": "#c796e2"
+          },
+          {
+            "key": "hex_5",
+            "label": "PALETTE HEX 5",
+            "value": "#3f1955",
+            "defaultValue": "#3f1955",
+            "rawHex": "#3f1955"
+          },
+          {
+            "key": "hex_6",
+            "label": "PALETTE HEX 6",
+            "value": "#b46bd8",
+            "defaultValue": "#b46bd8",
+            "rawHex": "#b46bd8"
+          },
+          {
+            "key": "hex_7",
+            "label": "PALETTE HEX 7",
+            "value": "#dfa3f8",
+            "defaultValue": "#dfa3f8",
+            "rawHex": "#dfa3f8"
+          },
+          {
+            "key": "hex_8",
+            "label": "PALETTE HEX 8",
+            "value": "#f4d3ff",
+            "defaultValue": "#f4d3ff",
+            "rawHex": "#f4d3ff"
+          }
+        ],
+        "shaderColorParams": []
+      },
+      "htmlProperties": {
+        "documentTitle": {
+          "label": "HTML <TITLE> PROPERTY",
+          "value": "Asset 31 — Moonlit Night Sakura Canopy &amp; Drifting Petals",
+          "defaultValue": "Asset 31 — Moonlit Night Sakura Canopy &amp; Drifting Petals",
+          "type": "text"
+        },
+        "bodyId": {
+          "label": "BODY [ID] ATTRIBUTE",
+          "value": "assets-asset-31",
+          "defaultValue": "assets-asset-31",
+          "type": "text"
+        },
+        "bodyClass": {
+          "label": "BODY [CLASS] ATTRIBUTE",
+          "value": "",
+          "defaultValue": "",
+          "type": "text"
+        },
+        "bodyDir": {
+          "label": "HTML [DIR] DIRECTION",
+          "value": "ltr",
+          "defaultValue": "ltr",
+          "options": [
+            "ltr",
+            "rtl"
+          ]
+        },
+        "dataTheme": {
+          "label": "BODY [DATA-THEME] ATTRIBUTE",
+          "value": "dark-carbon",
+          "defaultValue": "dark-carbon",
+          "type": "text"
+        },
+        "fontFamily": {
+          "label": "COMPONENT FONT-FAMILY",
+          "value": "Inter, system-ui, sans-serif",
+          "defaultValue": "Inter, system-ui, sans-serif",
+          "options": [
+            "Inter, system-ui, sans-serif",
+            "monospace",
+            "sans-serif"
+          ]
+        },
+        "cursor": {
+          "label": "STAGE [STYLE.CURSOR]",
+          "value": "grab",
+          "defaultValue": "grab",
+          "options": [
+            "default",
+            "grab",
+            "pointer",
+            "crosshair",
+            "none"
+          ]
+        },
+        "overflow": {
+          "label": "BODY [STYLE.OVERFLOW]",
+          "value": "hidden",
+          "defaultValue": "hidden",
+          "options": [
+            "hidden",
+            "visible",
+            "auto"
+          ]
+        },
+        "opacity": {
+          "label": "BODY [STYLE.OPACITY]",
+          "value": 1,
+          "defaultValue": 1,
+          "min": 0.1,
+          "max": 1,
+          "step": 0.05
+        },
+        "padding": {
+          "label": "BODY [STYLE.PADDING]",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 64,
+          "step": 2,
+          "unit": "px"
+        },
+        "borderRadius": {
+          "label": "STAGE [STYLE.BORDER-RADIUS]",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 80,
+          "step": 2,
+          "unit": "px"
+        },
+        "borderWidth": {
+          "label": "STAGE [STYLE.BORDER-WIDTH]",
+          "value": 0,
+          "defaultValue": 0,
+          "min": 0,
+          "max": 16,
+          "step": 1,
+          "unit": "px"
+        },
+        "borderColor": {
+          "label": "STAGE [STYLE.BORDER-COLOR]",
+          "value": "#ff5500",
+          "defaultValue": "#ff5500",
+          "type": "color"
+        },
+        "stageWidth": {
+          "label": "STAGE [STYLE.WIDTH]",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 30,
+          "max": 100,
+          "step": 2,
+          "unit": "%"
+        },
+        "stageHeight": {
+          "label": "STAGE [STYLE.HEIGHT]",
+          "value": 100,
+          "defaultValue": 100,
+          "min": 30,
+          "max": 100,
+          "step": 2,
+          "unit": "%"
+        },
+        "mixBlendMode": {
+          "label": "STAGE [STYLE.MIX-BLEND-MODE]",
+          "value": "normal",
+          "defaultValue": "normal",
+          "options": [
+            "normal",
+            "screen",
+            "lighten",
+            "multiply",
+            "difference",
+            "exclusion",
+            "overlay"
+          ]
+        },
+        "domElements": [],
+        "cssRuleParams": [],
         "stringParams": [],
         "imageSlots": []
       }
